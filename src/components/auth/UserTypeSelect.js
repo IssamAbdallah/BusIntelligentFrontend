@@ -12,7 +12,7 @@ export default function UserTypeSelect() {
           <Logo size="large" variant="dark" />
         </div>
         
-        <h1 className="text-2xl font-bold mb-2 text-center text-gray-800">Bienvenue sur Smart Bus</h1>
+        <h1 className="text-2xl font-bold mb-2 text-center text-gray-800">Bienvenue sur Bus Scolaire Intelligent</h1>
         <p className="mb-8 text-gray-600 text-center">Sélectionnez votre type d'utilisateur pour continuer</p>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
