@@ -1,4 +1,5 @@
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import UserTypeSelect from './components/auth/UserTypeSelect';
 import LoginForm from './components/auth/LoginForm';
 import AdminDashboard from './components/admin/Dashboard';
@@ -6,35 +7,23 @@ import ParentDashboard from './components/parent/Dashboard';
 
 // Composant principal qui détermine quelle page afficher
 function Main() {
-  const { userType, isLoggedIn } = useAuth();
-
-  // Sélection du type d'utilisateur
-  if (!userType) {
-    return <UserTypeSelect />;
-  }
-
-  // Formulaire de connexion
-  if (!isLoggedIn) {
-    return <LoginForm />;
-  }
-
-  // Dashboard selon le type d'utilisateur
-  if (userType === 'admin') {
-    return <AdminDashboard />;
-  }
-
-  if (userType === 'parent') {
-    return <ParentDashboard />;
-  }
-
-  return <div>Chargement...</div>;
+  return (
+    <Routes>
+      <Route path="/user-type-select" element={<UserTypeSelect />} />
+      <Route path="/login" element={<LoginForm />} />
+      <Route path="/admin/dashboard" element={<AdminDashboard />} />
+      <Route path="/parent/dashboard" element={<ParentDashboard />} />
+      <Route path="/" element={<UserTypeSelect />} />
+    </Routes>
+  );
 }
 
-// App avec le contexte d'authentification
 export default function App() {
   return (
-    <AuthProvider>
-      <Main />
-    </AuthProvider>
+    <Router>
+      <AuthProvider>
+        <Main />
+      </AuthProvider>
+    </Router>
   );
 }
