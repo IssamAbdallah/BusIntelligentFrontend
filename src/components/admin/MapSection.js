@@ -4,7 +4,7 @@ export default function MapSection() {
   const position = [36.8065, 10.1815]; // Tunis, Tunisie (peut être utilisé pour personnaliser l'URL si nécessaire)
 
   return (
-    <div className="bg-white rounded-xl shadow-card overflow-hidden">
+    <div className="bg-white rounded-xl shadow-card overflow-hidden h-full flex flex-col">
       <div className="p-4 border-b border-gray-100 flex justify-between items-center">
         <h2 className="text-lg font-semibold text-gray-800">Carte des bus en temps réel</h2>
         
@@ -24,7 +24,7 @@ export default function MapSection() {
       </div>
       
       <div className="p-4 bg-gray-50 border-b border-gray-100">
-        <div className="flex">
+        <div className="flex w-full">
           <div className="relative flex-grow">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search size={18} className="text-gray-400" />
@@ -50,8 +50,8 @@ export default function MapSection() {
         </div>
       </div>
       
-      <div className="relative h-[500px] w-full">
-        <div style={{ flex: 1 }}>
+      <div className="relative flex-1 w-full">
+        <div className="h-full w-full">
           <iframe
             title="map"
             src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3151.8354345095696!2d144.95373631531598!3d-37.816279179751824!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x6ad65d43f2f5e1d1%3A0x1efcf2c273153b14!2sGoogle!5e0!3m2!1sen!2sus!4v1630645032032!5m2!1sen!2sus"

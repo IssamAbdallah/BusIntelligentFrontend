@@ -13,54 +13,58 @@ export default function AdminDashboard() {
     { id: 1, busNumber: 'BUS001', route: 'Route A', driver: 'JohnDoe' },
     { id: 2, busNumber: 'BUS002', route: 'Route B', driver: 'JaneSmith' },
   ]);
-  const [showAddForm, setShowAddForm] = useState({ users: false, buses: false });
-  const [showEditForm, setShowEditForm] = useState({ users: false, buses: false });
-  const [newUser, setNewUser] = useState({ username: '', email: '', role: '', cinNumber: '', password: '', licenseNumber: '' });
-  const [newBus, setNewBus] = useState({ busNumber: '', route: '', driver: '' });
-  const [editUser, setEditUser] = useState(null);
-  const [editBus, setEditBus] = useState(null);
+  const [showForm, setShowForm] = useState({ users: false, buses: false });
+  const [newUser, setNewUser] = useState({ id: null, username: '', email: '', role: '', cinNumber: '', password: '', licenseNumber: '' });
+  const [newBus, setNewBus] = useState({ id: null, busNumber: '', route: '', driver: '' });
 
-  const handleAddUser = (e) => {
+  const handleSubmitUser = (e) => {
     e.preventDefault();
-    const newId = users.length + 1;
-    const userToAdd = { id: newId, username: newUser.username, email: newUser.email, role: newUser.role, cinNumber: newUser.cinNumber };
+    const userToAdd = { username: newUser.username, email: newUser.email, role: newUser.role, cinNumber: newUser.cinNumber };
     if (newUser.role === 'parent') userToAdd.password = newUser.password;
     if (newUser.role === 'conducteur') userToAdd.licenseNumber = newUser.licenseNumber;
-    setUsers([...users, userToAdd]);
-    setNewUser({ username: '', email: '', role: '', cinNumber: '', password: '', licenseNumber: '' });
-    setShowAddForm({ ...showAddForm, users: false });
+
+    if (newUser.id) {
+      // Update existing user
+      setUsers(users.map(user => user.id === newUser.id ? { ...userToAdd, id: newUser.id } : user));
+    } else {
+      // Add new user
+      const newId = users.length + 1;
+      setUsers([...users, { ...userToAdd, id: newId }]);
+    }
+    setNewUser({ id: null, username: '', email: '', role: '', cinNumber: '', password: '', licenseNumber: '' });
+    setShowForm({ ...showForm, users: false });
   };
 
-  const handleAddBus = (e) => {
+  const handleSubmitBus = (e) => {
     e.preventDefault();
-    const newId = buses.length + 1;
-    setBuses([...buses, { id: newId, ...newBus }]);
-    setNewBus({ busNumber: '', route: '', driver: '' });
-    setShowAddForm({ ...showAddForm, buses: false });
+    if (newBus.id) {
+      // Update existing bus
+      setBuses(buses.map(bus => bus.id === newBus.id ? { ...newBus } : bus));
+    } else {
+      // Add new bus
+      const newId = buses.length + 1;
+      setBuses([...buses, { id: newId, ...newBus }]);
+    }
+    setNewBus({ id: null, busNumber: '', route: '', driver: '' });
+    setShowForm({ ...showForm, buses: false });
   };
 
   const handleEditUser = (user) => {
-    setEditUser({ ...user });
-    setShowEditForm({ ...showEditForm, users: true });
+    setNewUser({ 
+      id: user.id, 
+      username: user.username, 
+      email: user.email, 
+      role: user.role, 
+      cinNumber: user.cinNumber, 
+      password: user.password || '', 
+      licenseNumber: user.licenseNumber || '' 
+    });
+    setShowForm({ ...showForm, users: true });
   };
 
   const handleEditBus = (bus) => {
-    setEditBus({ ...bus });
-    setShowEditForm({ ...showEditForm, buses: true });
-  };
-
-  const handleSaveUser = (e) => {
-    e.preventDefault();
-    setUsers(users.map(user => user.id === editUser.id ? editUser : user));
-    setEditUser(null);
-    setShowEditForm({ ...showEditForm, users: false });
-  };
-
-  const handleSaveBus = (e) => {
-    e.preventDefault();
-    setBuses(buses.map(bus => bus.id === editBus.id ? editBus : bus));
-    setEditBus(null);
-    setShowEditForm({ ...showEditForm, buses: false });
+    setNewBus({ id: bus.id, busNumber: bus.busNumber, route: bus.route, driver: bus.driver });
+    setShowForm({ ...showForm, buses: true });
   };
 
   const handleDeleteUser = (id) => {
@@ -75,12 +79,8 @@ export default function AdminDashboard() {
     const { name, value } = e.target;
     if (type === 'user') {
       setNewUser({ ...newUser, [name]: value });
-    } else if (type === 'editUser') {
-      setEditUser({ ...editUser, [name]: value });
     } else if (type === 'bus') {
       setNewBus({ ...newBus, [name]: value });
-    } else if (type === 'editBus') {
-      setEditBus({ ...editBus, [name]: value });
     }
   };
 
@@ -88,16 +88,16 @@ export default function AdminDashboard() {
     <div className="flex h-screen bg-gray-100">
       <Sidebar onSectionChange={setActiveSection} />
       
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 flex flex-col w-full">
         <header className="bg-white shadow-sm">
-          <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+          <div className="w-full mx-auto py-4 px-4 sm:px-6 lg:px-8">
             <h1 className="text-2xl font-bold text-gray-900">
               {activeSection === 'dashboard' ? 'Tableau de bord' : activeSection === 'users' ? 'Utilisateurs' : activeSection === 'buses' ? 'Bus' : 'Statistiques'}
             </h1>
           </div>
         </header>
         
-        <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <main className="flex-1 w-full px-4 sm:px-6 lg:px-8">
           {activeSection === 'dashboard' && <MapSection />}
           
           {activeSection === 'users' && (
@@ -105,16 +105,19 @@ export default function AdminDashboard() {
               <div className="p-4 border-b border-gray-100 flex justify-between items-center">
                 <h2 className="text-lg font-semibold text-gray-800">Liste des utilisateurs</h2>
                 <button
-                  onClick={() => setShowAddForm({ ...showAddForm, users: true })}
+                  onClick={() => {
+                    setNewUser({ id: null, username: '', email: '', role: '', cinNumber: '', password: '', licenseNumber: '' });
+                    setShowForm({ ...showForm, users: true });
+                  }}
                   className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   + Ajouter
                 </button>
               </div>
               
-              {showAddForm.users && (
+              {showForm.users && (
                 <div className="p-4 border-b border-gray-100">
-                  <form onSubmit={handleAddUser} className="space-y-4">
+                  <form onSubmit={handleSubmitUser} className="space-y-4">
                     <div>
                       <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="role">
                         Rôle
@@ -216,128 +219,11 @@ export default function AdminDashboard() {
                         type="submit"
                         className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                       >
-                        Ajouter
+                        {newUser.id ? 'Sauvegarder' : 'Ajouter'}
                       </button>
                       <button
                         type="button"
-                        onClick={() => setShowAddForm({ ...showAddForm, users: false })}
-                        className="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
-                      >
-                        Annuler
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              )}
-              
-              {showEditForm.users && editUser && (
-                <div className="p-4 border-b border-gray-100">
-                  <form onSubmit={handleSaveUser} className="space-y-4">
-                    <div>
-                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="role">
-                        Rôle
-                      </label>
-                      <select
-                        id="role"
-                        name="role"
-                        value={editUser.role}
-                        onChange={(e) => handleInputChange(e, 'editUser')}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      >
-                        <option value="conducteur">Conducteur</option>
-                        <option value="parent">Parent</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="cinNumber">
-                        Num CIN
-                      </label>
-                      <input
-                        id="cinNumber"
-                        name="cinNumber"
-                        type="text"
-                        placeholder="Num CIN"
-                        value={editUser.cinNumber}
-                        onChange={(e) => handleInputChange(e, 'editUser')}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="username">
-                        Nom d'utilisateur
-                      </label>
-                      <input
-                        id="username"
-                        name="username"
-                        type="text"
-                        placeholder="Nom d'utilisateur"
-                        value={editUser.username}
-                        onChange={(e) => handleInputChange(e, 'editUser')}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="email">
-                        Email
-                      </label>
-                      <input
-                        id="email"
-                        name="email"
-                        type="email"
-                        placeholder="Email"
-                        value={editUser.email}
-                        onChange={(e) => handleInputChange(e, 'editUser')}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
-                    {editUser.role === 'parent' && (
-                      <div>
-                        <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="password">
-                          Mot de passe
-                        </label>
-                        <input
-                          id="password"
-                          name="password"
-                          type="password"
-                          placeholder="Mot de passe"
-                          value={editUser.password || ''}
-                          onChange={(e) => handleInputChange(e, 'editUser')}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          required
-                        />
-                      </div>
-                    )}
-                    {editUser.role === 'conducteur' && (
-                      <div>
-                        <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="licenseNumber">
-                          Numéro de permis
-                        </label>
-                        <input
-                          id="licenseNumber"
-                          name="licenseNumber"
-                          type="text"
-                          placeholder="Numéro de permis"
-                          value={editUser.licenseNumber || ''}
-                          onChange={(e) => handleInputChange(e, 'editUser')}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          required
-                        />
-                      </div>
-                    )}
-                    <div className="flex space-x-2">
-                      <button
-                        type="submit"
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        Sauvegarder
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowEditForm({ ...showEditForm, users: false })}
+                        onClick={() => setShowForm({ ...showForm, users: false })}
                         className="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
                       >
                         Annuler
@@ -400,18 +286,21 @@ export default function AdminDashboard() {
           {activeSection === 'buses' && (
             <div className="bg-white rounded-xl shadow-card overflow-hidden">
               <div className="p-4 border-b border-gray-100 flex justify-between items-center">
-                <h2 className="text-lg font-semibold text-gray-800">Liste des bus</h2>
+                <h1 className="text-lg font-semibold text-gray-800">Liste des bus</h1>
                 <button
-                  onClick={() => setShowAddForm({ ...showAddForm, buses: true })}
+                  onClick={() => {
+                    setNewBus({ id: null, busNumber: '', route: '', driver: '' });
+                    setShowForm({ ...showForm, buses: true });
+                  }}
                   className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   + Ajouter
                 </button>
               </div>
               
-              {showAddForm.buses && (
+              {showForm.buses && (
                 <div className="p-4 border-b border-gray-100">
-                  <form onSubmit={handleAddBus} className="space-y-4">
+                  <form onSubmit={handleSubmitBus} className="space-y-4">
                     <div>
                       <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="busNumber">
                         Numéro de bus
@@ -462,78 +351,11 @@ export default function AdminDashboard() {
                         type="submit"
                         className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                       >
-                        Ajouter
+                        {newBus.id ? 'Sauvegarder' : 'Ajouter'}
                       </button>
                       <button
                         type="button"
-                        onClick={() => setShowAddForm({ ...showAddForm, buses: false })}
-                        className="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
-                      >
-                        Annuler
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              )}
-              
-              {showEditForm.buses && editBus && (
-                <div className="p-4 border-b border-gray-100">
-                  <form onSubmit={handleSaveBus} className="space-y-4">
-                    <div>
-                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="busNumber">
-                        Numéro de bus
-                      </label>
-                      <input
-                        id="busNumber"
-                        name="busNumber"
-                        type="text"
-                        placeholder="Numéro de bus"
-                        value={editBus.busNumber}
-                        onChange={(e) => handleInputChange(e, 'editBus')}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="route">
-                        Itinéraire
-                      </label>
-                      <input
-                        id="route"
-                        name="route"
-                        type="text"
-                        placeholder="Itinéraire"
-                        value={editBus.route}
-                        onChange={(e) => handleInputChange(e, 'editBus')}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="driver">
-                        Conducteur
-                      </label>
-                      <input
-                        id="driver"
-                        name="driver"
-                        type="text"
-                        placeholder="Conducteur"
-                        value={editBus.driver}
-                        onChange={(e) => handleInputChange(e, 'editBus')}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
-                    <div className="flex space-x-2">
-                      <button
-                        type="submit"
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        Sauvegarder
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowEditForm({ ...showEditForm, buses: false })}
+                        onClick={() => setShowForm({ ...showForm, buses: false })}
                         className="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
                       >
                         Annuler
