@@ -1,27 +1,22 @@
 import { useState } from 'react';
-import { MapPin, Menu, LogOut, User, Bus, School, ChevronRight, ChevronLeft, Settings, BarChart, Bell } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import Logo from './Logo';
+import { LayoutDashboard, Users, BarChart2, Bus, Bell, LogOut, ChevronRight, ChevronLeft } from 'lucide-react';
 
-export default function Sidebar() {
+export default function Sidebar({ onSectionChange }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeMenu, setActiveMenu] = useState('map');
-  const { handleLogout } = useAuth();
+  const [activeMenu, setActiveMenu] = useState('dashboard');
 
   const menuItems = [
-    { id: 'map', icon: MapPin, label: 'Carte' },
-    { id: 'bus', icon: Bus, label: 'Bus' },
-    { id: 'schools', icon: School, label: 'Écoles' },
-    { id: 'users', icon: User, label: 'Utilisateurs' },
-    { id: 'stats', icon: BarChart, label: 'Statistiques' },
-    { id: 'alerts', icon: Bell, label: 'Alertes' },
-    { id: 'settings', icon: Settings, label: 'Paramètres' }
+    { id: 'dashboard', icon: LayoutDashboard, label: 'Tableau de bord' },
+    { id: 'users', icon: Users, label: 'Utilisateurs' },
+    { id: 'buses', icon: Bus, label: 'Bus' },
+    { id: 'stats', icon: BarChart2, label: 'Statistiques' },
+    { id: 'drivers', icon: Bell, label: 'Alertes' },
   ];
 
   return (
     <div className={`bg-blue-800 text-white ${sidebarOpen ? 'w-64' : 'w-20'} transition-all duration-300 flex flex-col h-screen`}>
       <div className="p-4 flex items-center justify-between border-b border-blue-700">
-        {sidebarOpen && <Logo size={sidebarOpen ? 'default' : 'small'} variant="primary" />}
+        {sidebarOpen && <h1 className="text-xl font-bold text-white">Dashboard</h1>}
         <button 
           onClick={() => setSidebarOpen(!sidebarOpen)} 
           className="p-2 rounded-lg hover:bg-blue-700 transition-colors"
@@ -41,7 +36,10 @@ export default function Sidebar() {
                     ? 'bg-blue-700 text-white' 
                     : 'text-blue-100 hover:bg-blue-700/50'
                 }`}
-                onClick={() => setActiveMenu(item.id)}
+                onClick={() => {
+                  setActiveMenu(item.id);
+                  onSectionChange(item.id);
+                }}
               >
                 <item.icon size={22} className={`${!sidebarOpen && 'mx-auto'}`} />
                 {sidebarOpen && <span className="ml-3 font-medium">{item.label}</span>}
@@ -53,7 +51,7 @@ export default function Sidebar() {
       
       <div className="p-4 border-t border-blue-700">
         <button 
-          onClick={handleLogout}
+          onClick={() => window.location.href = '/user-type-select'}
           className="flex items-center p-2 w-full hover:bg-blue-700/70 rounded-lg transition-colors text-blue-100"
           aria-label="Déconnexion"
         >

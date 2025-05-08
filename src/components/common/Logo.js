@@ -12,14 +12,14 @@ export default function Logo({ size = 'default', variant = 'primary' }) {
   const variantClasses = {
     primary: 'text-white',
     admin: 'text-blue-600',
-    parent: 'text-green-600',
+    parent: 'text-yellow-600',
     dark: 'text-gray-800'
   };
   
   return (
     <div className={`font-bold flex items-center ${sizeClasses[size]} ${variantClasses[variant]}`}>
       <Bus className="mr-2" size={size === 'small' ? 20 : size === 'large' ? 32 : 24} strokeWidth={2.5} />
-      <span>Smart<span className="font-extrabold">Bus</span></span>
+      <span>BS<span className="font-extrabold">I</span></span>
     </div>
   );
 }

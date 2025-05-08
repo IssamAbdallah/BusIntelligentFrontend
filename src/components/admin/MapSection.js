@@ -1,6 +1,8 @@
-import { Search, Filter, MapPin, RefreshCw } from 'lucide-react';
+import { Search, Filter, RefreshCw } from 'lucide-react';
 
 export default function MapSection() {
+  const position = [36.8065, 10.1815]; // Tunis, Tunisie (peut être utilisé pour personnaliser l'URL si nécessaire)
+
   return (
     <div className="bg-white rounded-xl shadow-card overflow-hidden">
       <div className="p-4 border-b border-gray-100 flex justify-between items-center">
@@ -48,17 +50,19 @@ export default function MapSection() {
         </div>
       </div>
       
-      <div className="relative h-96">
-        <div className="bg-gray-200 h-full w-full">
-          {/* Ici sera intégrée une vraie carte (Google Maps, Leaflet, etc.) */}
-          <div className="absolute inset-0 flex items-center justify-center flex-col">
-            <MapPin size={48} className="text-gray-400 mb-3" />
-            <p className="text-gray-500 font-medium">Carte interactive des bus</p>
-            <p className="text-gray-400 text-sm">Intégration avec Google Maps ou Leaflet</p>
-          </div>
+      <div className="relative h-[500px] w-full">
+        <div style={{ flex: 1 }}>
+          <iframe
+            title="map"
+            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3151.8354345095696!2d144.95373631531598!3d-37.816279179751824!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x6ad65d43f2f5e1d1%3A0x1efcf2c273153b14!2sGoogle!5e0!3m2!1sen!2sus!4v1630645032032!5m2!1sen!2sus"
+            width="100%"
+            height="100%"
+            style={{ border: 0 }}
+            allowFullScreen=""
+            loading="lazy"
+          ></iframe>
         </div>
         
-        {/* Légende en overlay */}
         <div className="absolute bottom-4 right-4 bg-white p-3 rounded-lg shadow-lg">
           <h4 className="text-sm font-semibold mb-2">Légende</h4>
           <div className="flex items-center mb-1">

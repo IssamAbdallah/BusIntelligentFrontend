@@ -7,8 +7,8 @@
 :root {
   --primary-admin: #2563eb;
   --primary-admin-dark: #1d4ed8;
-  --primary-parent: #16a34a;
-  --primary-parent-dark: #15803d;
+  --primary-parent: yellow;
+  --primary-parent-dark: yellow;
 }
 
 body {
