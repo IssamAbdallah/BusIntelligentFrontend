@@ -1,63 +1,189 @@
 import Sidebar from '../common/Sidebar';
 import MapSection from './MapSection';
 import StatsSection from './StatsSection';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function AdminDashboard() {
   const [activeSection, setActiveSection] = useState('dashboard');
-  const [users, setUsers] = useState([
-    { id: 1, username: 'JohnDoe', email: 'john@example.com', role: 'conducteur', cinNumber: 'CIN001', licenseNumber: 'L001' },
-    { id: 2, username: 'JaneSmith', email: 'jane@example.com', role: 'parent', cinNumber: 'CIN002', password: 'pass123' },
-  ]);
-  const [buses, setBuses] = useState([
-    { id: 1, busNumber: 'BUS001', route: 'Route A', driver: 'JohnDoe' },
-    { id: 2, busNumber: 'BUS002', route: 'Route B', driver: 'JaneSmith' },
-  ]);
+  const [users, setUsers] = useState([]);
+  const [buses, setBuses] = useState([]);
   const [showForm, setShowForm] = useState({ users: false, buses: false });
   const [newUser, setNewUser] = useState({ id: null, username: '', email: '', role: '', cinNumber: '', password: '', licenseNumber: '' });
   const [newBus, setNewBus] = useState({ id: null, busNumber: '', route: '', driver: '' });
 
-  const handleSubmitUser = (e) => {
+  // Charger les utilisateurs au démarrage
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/users');
+        const data = await response.json();
+        console.log('Fetched users:', data);
+        if (response.ok) {
+          setUsers(data.map(user => ({
+            id: user._id,
+            username: user.username,
+            email: user.email,
+            role: user.role,
+            cinNumber: user.myadmin || '',
+            password: '', // Masqué comme dans le backend
+            licenseNumber: user.role === 'conducteur' ? user.licenseNumber || '' : ''
+          })));
+        } else {
+          console.error('Failed to fetch users:', data.message);
+        }
+      } catch (error) {
+        console.error('Error fetching users:', error.message);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  // Charger les bus au démarrage
+  useEffect(() => {
+    const fetchBuses = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/vehicles');
+        const data = await response.json();
+        console.log('Fetched buses:', data);
+        if (response.ok) {
+          setBuses(data.map(bus => ({
+            id: bus._id,
+            busNumber: bus.uniqueId,
+            route: bus.name,
+            driver: bus.driver || ''
+          })));
+        } else {
+          console.error('Failed to fetch buses:', data.message);
+        }
+      } catch (error) {
+        console.error('Error fetching buses:', error.message);
+      }
+    };
+    fetchBuses();
+  }, []);
+
+  const handleSubmitUser = async (e) => {
     e.preventDefault();
-    const userToAdd = { username: newUser.username, email: newUser.email, role: newUser.role, cinNumber: newUser.cinNumber };
+    const userToAdd = {
+      username: newUser.username,
+      email: newUser.email,
+      role: newUser.role,
+      myadmin: newUser.cinNumber
+    };
     if (newUser.role === 'parent') userToAdd.password = newUser.password;
     if (newUser.role === 'conducteur') userToAdd.licenseNumber = newUser.licenseNumber;
 
-    if (newUser.id) {
-      // Update existing user
-      setUsers(users.map(user => user.id === newUser.id ? { ...userToAdd, id: newUser.id } : user));
-    } else {
-      // Add new user
-      const newId = users.length + 1;
-      setUsers([...users, { ...userToAdd, id: newId }]);
+    console.log('Sending user data:', userToAdd);
+
+    try {
+      const method = newUser.id ? 'PUT' : 'POST';
+      const url = newUser.id 
+        ? `http://localhost:5000/api/users/${newUser.id}`
+        : 'http://localhost:5000/api/users';
+
+      const response = await fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userToAdd),
+      });
+      console.log('Response status:', response.status);
+      const data = await response.json();
+      console.log('Response data:', data);
+
+      if (response.ok) {
+        if (newUser.id) {
+          // Mise à jour d'un utilisateur existant
+          setUsers(users.map(user => user.id === newUser.id ? {
+            id: newUser.id,
+            username: data.username,
+            email: data.email,
+            role: data.role,
+            cinNumber: data.myadmin,
+            password: '',
+            licenseNumber: data.role === 'conducteur' ? data.licenseNumber || '' : ''
+          } : user));
+        } else {
+          // Ajout d'un nouvel utilisateur
+          setUsers([...users, {
+            id: data._id,
+            username: data.username,
+            email: data.email,
+            role: data.role,
+            cinNumber: data.myadmin,
+            password: '',
+            licenseNumber: data.role === 'conducteur' ? data.licenseNumber || '' : ''
+          }]);
+        }
+        setNewUser({ id: null, username: '', email: '', role: '', cinNumber: '', password: '', licenseNumber: '' });
+        setShowForm({ ...showForm, users: false });
+      } else {
+        console.error('Failed to save user:', data.message);
+      }
+    } catch (error) {
+      console.error('Error saving user:', error.message);
     }
-    setNewUser({ id: null, username: '', email: '', role: '', cinNumber: '', password: '', licenseNumber: '' });
-    setShowForm({ ...showForm, users: false });
   };
 
-  const handleSubmitBus = (e) => {
+  const handleSubmitBus = async (e) => {
     e.preventDefault();
-    if (newBus.id) {
-      // Update existing bus
-      setBuses(buses.map(bus => bus.id === newBus.id ? { ...newBus } : bus));
-    } else {
-      // Add new bus
-      const newId = buses.length + 1;
-      setBuses([...buses, { id: newId, ...newBus }]);
+    const busToAdd = {
+      uniqueId: newBus.busNumber,
+      name: newBus.route
+    };
+    console.log('Sending bus data:', busToAdd);
+
+    try {
+      const method = newBus.id ? 'PUT' : 'POST';
+      const url = newBus.id 
+        ? `http://localhost:5000/api/vehicles/${newBus.id}`
+        : 'http://localhost:5000/api/vehicles';
+
+      const response = await fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(busToAdd),
+      });
+      console.log('Response status:', response.status);
+      const data = await response.json();
+      console.log('Response data:', data);
+
+      if (response.ok) {
+        if (newBus.id) {
+          // Mise à jour d'un bus existant
+          setBuses(buses.map(bus => bus.id === newBus.id ? {
+            id: newBus.id,
+            busNumber: data.uniqueId,
+            route: data.name,
+            driver: newBus.driver
+          } : bus));
+        } else {
+          // Ajout d'un nouveau bus
+          setBuses([...buses, {
+            id: data._id,
+            busNumber: data.uniqueId,
+            route: data.name,
+            driver: newBus.driver
+          }]);
+        }
+        setNewBus({ id: null, busNumber: '', route: '', driver: '' });
+        setShowForm({ ...showForm, buses: false });
+      } else {
+        console.error('Failed to save bus:', data.message);
+      }
+    } catch (error) {
+      console.error('Error saving bus:', error.message);
     }
-    setNewBus({ id: null, busNumber: '', route: '', driver: '' });
-    setShowForm({ ...showForm, buses: false });
   };
 
   const handleEditUser = (user) => {
-    setNewUser({ 
-      id: user.id, 
-      username: user.username, 
-      email: user.email, 
-      role: user.role, 
-      cinNumber: user.cinNumber, 
-      password: user.password || '', 
-      licenseNumber: user.licenseNumber || '' 
+    setNewUser({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      cinNumber: user.cinNumber,
+      password: user.password || '',
+      licenseNumber: user.role === 'conducteur' ? user.licenseNumber || '' : ''
     });
     setShowForm({ ...showForm, users: true });
   };
@@ -67,12 +193,42 @@ export default function AdminDashboard() {
     setShowForm({ ...showForm, buses: true });
   };
 
-  const handleDeleteUser = (id) => {
-    setUsers(users.filter(user => user.id !== id));
+  const handleDeleteUser = async (id) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/users/${id}`, {
+        method: 'DELETE',
+      });
+      console.log('Delete response status:', response.status);
+      const data = await response.json();
+      console.log('Delete response data:', data);
+
+      if (response.ok) {
+        setUsers(users.filter(user => user.id !== id));
+      } else {
+        console.error('Failed to delete user:', data.message);
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error.message);
+    }
   };
 
-  const handleDeleteBus = (id) => {
-    setBuses(buses.filter(bus => bus.id !== id));
+  const handleDeleteBus = async (id) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/vehicles/${id}`, {
+        method: 'DELETE',
+      });
+      console.log('Delete response status:', response.status);
+      const data = await response.json();
+      console.log('Delete response data:', data);
+
+      if (response.ok) {
+        setBuses(buses.filter(bus => bus.id !== id));
+      } else {
+        console.error('Failed to delete bus:', data.message);
+      }
+    } catch (error) {
+      console.error('Error deleting bus:', error.message);
+    }
   };
 
   const handleInputChange = (e, type) => {
@@ -131,8 +287,8 @@ export default function AdminDashboard() {
                         required
                       >
                         <option value="">Sélectionner un rôle</option>
-                        <option value="conducteur">Conducteur</option>
                         <option value="parent">Parent</option>
+                        <option value="conducteur">Conducteur</option>
                       </select>
                     </div>
                     <div>
@@ -343,7 +499,6 @@ export default function AdminDashboard() {
                         value={newBus.driver}
                         onChange={(e) => handleInputChange(e, 'bus')}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
                       />
                     </div>
                     <div className="flex space-x-2">

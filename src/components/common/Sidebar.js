@@ -10,7 +10,7 @@ export default function Sidebar({ onSectionChange }) {
     { id: 'users', icon: Users, label: 'Utilisateurs' },
     { id: 'buses', icon: Bus, label: 'Bus' },
     { id: 'stats', icon: BarChart2, label: 'Statistiques' },
-    { id: 'drivers', icon: Bell, label: 'Alertes' },
+    { id: 'notifications', icon: Bell, label: 'Alertes' },
   ];
 
   return (
