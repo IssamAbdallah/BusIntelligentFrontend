@@ -2,20 +2,30 @@ import Sidebar from '../common/Sidebar';
 import MapSection from './MapSection';
 import StatsSection from './StatsSection';
 import { useState, useEffect } from 'react';
+import { getWithExpiry } from '../../utils/localstorage'; // Assurez-vous que localstorage.js est dans src/utils/
+import { useNavigate } from 'react-router-dom'; // Importation corrigée pour useNavigate
 
-export default function AdminDashboard() {
+export default function AdminDashboard({ _userId }) {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [users, setUsers] = useState([]);
   const [buses, setBuses] = useState([]);
   const [showForm, setShowForm] = useState({ users: false, buses: false });
   const [newUser, setNewUser] = useState({ id: null, username: '', email: '', role: '', cinNumber: '', password: '', licenseNumber: '' });
-  const [newBus, setNewBus] = useState({ id: null, busNumber: '', route: '', driver: '' });
+  const [newBus, setNewBus] = useState({ id: null, busNumber: '', route: '', driver: '', temperature: '', humidity: '', pression: '', flame: false, latitude: '', longitude: '', positionId: '' });
+  const [options, setOptions] = useState([]);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [opening, setOpening] = useState(false);
+  const navigate = useNavigate();
 
   // Charger les utilisateurs au démarrage
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/users');
+        const response = await fetch('http://localhost:5000/api/users', {
+          headers: { 'Authorization': 'Bearer ' + (getWithExpiry('TOKEN') || 'VOTRE_TOKEN_ICI') },
+        });
         const data = await response.json();
         console.log('Fetched users:', data);
         if (response.ok) {
@@ -50,7 +60,14 @@ export default function AdminDashboard() {
             id: bus._id,
             busNumber: bus.uniqueId,
             route: bus.name,
-            driver: bus.driver || ''
+            driver: bus.driver || '',
+            temperature: bus.temperature || '',
+            humidity: bus.humidity || '',
+            pression: bus.pression || '',
+            flame: bus.flame || false,
+            latitude: bus.latitude || '',
+            longitude: bus.longitude || '',
+            positionId: bus.positionId || ''
           })));
         } else {
           console.error('Failed to fetch buses:', data.message);
@@ -62,8 +79,62 @@ export default function AdminDashboard() {
     fetchBuses();
   }, []);
 
+  // Charger les agences pour l'utilisateur
+  useEffect(() => {
+    const fetchAgencies = async () => {
+      setLoading(true);
+      try {
+        const token = getWithExpiry('TOKEN');
+        if (!token) {
+          setErrorMsg('Token expiré ou non trouvé');
+          setOpening(true);
+          navigate('/login');
+          return;
+        }
+
+        const response = await fetch(`${process.env.REACT_APP_URL_NAME}/useragences?userId=${_userId}`, {
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Agencies::', data);
+          setOptions([]);
+          const newOption = [];
+          for (let i = 0; i < data.length; i++) {
+            console.log('data agency:', data[i].agence_name);
+            newOption.push({ value: data[i].agence_name, label: data[i].agence_name });
+          }
+          setOptions(newOption);
+          setItems(data);
+        } else if (response.status === 401) {
+          setErrorMsg('UNAUTHORIZED');
+          setOpening(true);
+          navigate('/login');
+        } else {
+          setErrorMsg(await response.text());
+          setOpening(true);
+          throw new Error(await response.text());
+        }
+      } catch (error) {
+        console.error('Error fetching agencies:', error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (_userId) fetchAgencies();
+  }, [_userId]);
+
   const handleSubmitUser = async (e) => {
     e.preventDefault();
+    if (!newUser.username || !newUser.email || !newUser.role || !newUser.cinNumber) {
+      console.error('Tous les champs obligatoires sont requis');
+      return;
+    }
+
     const userToAdd = {
       username: newUser.username,
       email: newUser.email,
@@ -83,7 +154,7 @@ export default function AdminDashboard() {
 
       const response = await fetch(url, {
         method: method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (getWithExpiry('TOKEN') || 'VOTRE_TOKEN_ICI') },
         body: JSON.stringify(userToAdd),
       });
       console.log('Response status:', response.status);
@@ -92,7 +163,6 @@ export default function AdminDashboard() {
 
       if (response.ok) {
         if (newUser.id) {
-          // Mise à jour d'un utilisateur existant
           setUsers(users.map(user => user.id === newUser.id ? {
             id: newUser.id,
             username: data.username,
@@ -103,7 +173,6 @@ export default function AdminDashboard() {
             licenseNumber: data.role === 'conducteur' ? data.licenseNumber || '' : ''
           } : user));
         } else {
-          // Ajout d'un nouvel utilisateur
           setUsers([...users, {
             id: data._id,
             username: data.username,
@@ -126,9 +195,21 @@ export default function AdminDashboard() {
 
   const handleSubmitBus = async (e) => {
     e.preventDefault();
+    if (!newBus.busNumber || !newBus.route) {
+      console.error('Numéro de bus et Itinéraire sont requis');
+      return;
+    }
+
     const busToAdd = {
       uniqueId: newBus.busNumber,
-      name: newBus.route
+      name: newBus.route,
+      temperature: newBus.temperature,
+      humidity: newBus.humidity,
+      pression: newBus.pression,
+      flame: newBus.flame,
+      latitude: newBus.latitude,
+      longitude: newBus.longitude,
+      positionId: newBus.positionId
     };
     console.log('Sending bus data:', busToAdd);
 
@@ -149,23 +230,35 @@ export default function AdminDashboard() {
 
       if (response.ok) {
         if (newBus.id) {
-          // Mise à jour d'un bus existant
           setBuses(buses.map(bus => bus.id === newBus.id ? {
             id: newBus.id,
             busNumber: data.uniqueId,
             route: data.name,
-            driver: newBus.driver
+            driver: newBus.driver,
+            temperature: data.temperature,
+            humidity: data.humidity,
+            pression: data.pression,
+            flame: data.flame,
+            latitude: data.latitude,
+            longitude: data.longitude,
+            positionId: data.positionId
           } : bus));
         } else {
-          // Ajout d'un nouveau bus
           setBuses([...buses, {
             id: data._id,
             busNumber: data.uniqueId,
             route: data.name,
-            driver: newBus.driver
+            driver: newBus.driver,
+            temperature: data.temperature,
+            humidity: data.humidity,
+            pression: data.pression,
+            flame: data.flame,
+            latitude: data.latitude,
+            longitude: data.longitude,
+            positionId: data.positionId
           }]);
         }
-        setNewBus({ id: null, busNumber: '', route: '', driver: '' });
+        setNewBus({ id: null, busNumber: '', route: '', driver: '', temperature: '', humidity: '', pression: '', flame: false, latitude: '', longitude: '', positionId: '' });
         setShowForm({ ...showForm, buses: false });
       } else {
         console.error('Failed to save bus:', data.message);
@@ -189,7 +282,19 @@ export default function AdminDashboard() {
   };
 
   const handleEditBus = (bus) => {
-    setNewBus({ id: bus.id, busNumber: bus.busNumber, route: bus.route, driver: bus.driver });
+    setNewBus({
+      id: bus.id,
+      busNumber: bus.busNumber,
+      route: bus.route,
+      driver: bus.driver,
+      temperature: bus.temperature,
+      humidity: bus.humidity,
+      pression: bus.pression,
+      flame: bus.flame,
+      latitude: bus.latitude,
+      longitude: bus.longitude,
+      positionId: bus.positionId
+    });
     setShowForm({ ...showForm, buses: true });
   };
 
@@ -197,6 +302,7 @@ export default function AdminDashboard() {
     try {
       const response = await fetch(`http://localhost:5000/api/users/${id}`, {
         method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + (getWithExpiry('TOKEN') || 'VOTRE_TOKEN_ICI') },
       });
       console.log('Delete response status:', response.status);
       const data = await response.json();
@@ -232,11 +338,11 @@ export default function AdminDashboard() {
   };
 
   const handleInputChange = (e, type) => {
-    const { name, value } = e.target;
+    const { name, value, type: inputType, checked } = e.target;
     if (type === 'user') {
       setNewUser({ ...newUser, [name]: value });
     } else if (type === 'bus') {
-      setNewBus({ ...newBus, [name]: value });
+      setNewBus({ ...newBus, [name]: inputType === 'checkbox' ? checked : value });
     }
   };
 
@@ -445,7 +551,7 @@ export default function AdminDashboard() {
                 <h1 className="text-lg font-semibold text-gray-800">Liste des bus</h1>
                 <button
                   onClick={() => {
-                    setNewBus({ id: null, busNumber: '', route: '', driver: '' });
+                    setNewBus({ id: null, busNumber: '', route: '', driver: '', temperature: '', humidity: '', pression: '', flame: false, latitude: '', longitude: '', positionId: '' });
                     setShowForm({ ...showForm, buses: true });
                   }}
                   className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
@@ -501,6 +607,103 @@ export default function AdminDashboard() {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
+                    <div>
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="temperature">
+                        Température
+                      </label>
+                      <input
+                        id="temperature"
+                        name="temperature"
+                        type="text"
+                        placeholder="Température"
+                        value={newBus.temperature}
+                        onChange={(e) => handleInputChange(e, 'bus')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="humidity">
+                        Humidité
+                      </label>
+                      <input
+                        id="humidity"
+                        name="humidity"
+                        type="text"
+                        placeholder="Humidité"
+                        value={newBus.humidity}
+                        onChange={(e) => handleInputChange(e, 'bus')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="pression">
+                        Pression
+                      </label>
+                      <input
+                        id="pression"
+                        name="pression"
+                        type="text"
+                        placeholder="Pression"
+                        value={newBus.pression}
+                        onChange={(e) => handleInputChange(e, 'bus')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="flame">
+                        Flamme
+                      </label>
+                      <input
+                        id="flame"
+                        name="flame"
+                        type="checkbox"
+                        checked={newBus.flame}
+                        onChange={(e) => handleInputChange(e, 'bus')}
+                        className="w-5 h-5 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="latitude">
+                        Latitude
+                      </label>
+                      <input
+                        id="latitude"
+                        name="latitude"
+                        type="text"
+                        placeholder="Latitude"
+                        value={newBus.latitude}
+                        onChange={(e) => handleInputChange(e, 'bus')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="longitude">
+                        Longitude
+                      </label>
+                      <input
+                        id="longitude"
+                        name="longitude"
+                        type="text"
+                        placeholder="Longitude"
+                        value={newBus.longitude}
+                        onChange={(e) => handleInputChange(e, 'bus')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="positionId">
+                        ID de position
+                      </label>
+                      <input
+                        id="positionId"
+                        name="positionId"
+                        type="text"
+                        placeholder="ID de position"
+                        value={newBus.positionId}
+                        onChange={(e) => handleInputChange(e, 'bus')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
                     <div className="flex space-x-2">
                       <button
                         type="submit"
@@ -534,6 +737,27 @@ export default function AdminDashboard() {
                         Conducteur
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Température
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Humidité
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Pression
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Flamme
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Latitude
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Longitude
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        ID de position
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
@@ -544,6 +768,13 @@ export default function AdminDashboard() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.busNumber}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.route}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.driver}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.temperature}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.humidity}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.pression}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.flame ? 'Oui' : 'Non'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.latitude}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.longitude}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.positionId}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <button
                             onClick={() => handleEditBus(bus)}
