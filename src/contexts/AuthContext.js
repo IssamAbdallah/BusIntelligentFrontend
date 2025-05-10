@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { setWithExpiry, getWithExpiry } from '../utils/localstorage';
 
 // Création du contexte d'authentification
 const AuthContext = createContext();
@@ -9,22 +10,20 @@ export const useAuth = () => useContext(AuthContext);
 
 // Fournisseur du contexte d'authentification
 export const AuthProvider = ({ children }) => {
-  const [userType, setUserType] = useState(() => localStorage.getItem('userType') || null); // Récupérer depuis localStorage
+  const [userType, setUserType] = useState(() => localStorage.getItem('userType') || null);
   const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem('isLoggedIn') === 'true' || false);
   const [loginFormData, setLoginFormData] = useState({ email: '', password: '' });
-  const [user, setUser] = useState(null); // Stocker les infos utilisateur
-  const [token, setToken] = useState(localStorage.getItem('token') || null); // Récupérer le token depuis localStorage
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(() => getWithExpiry('TOKEN') || null); // Récupérer le token au démarrage
   const navigate = useNavigate();
 
   // Sauvegarder les états dans localStorage quand ils changent
   useEffect(() => {
-    localStorage.setItem('userType', userType);
-    localStorage.setItem('isLoggedIn', isLoggedIn);
-    if (token) localStorage.setItem('token', token);
-    else localStorage.removeItem('token');
-  }, [userType, isLoggedIn, token]);
+    localStorage.setItem('userType', userType || '');
+    localStorage.setItem('isLoggedIn', isLoggedIn.toString());
+  }, [userType, isLoggedIn]);
 
-  // Fonction pour gérer la connexion avec vérification dans une base de données
+  // Fonction pour gérer la connexion
   const handleLogin = async (e) => {
     if (e) e.preventDefault();
 
@@ -49,9 +48,14 @@ export const AuthProvider = ({ children }) => {
       console.log('Données de la réponse :', data);
 
       if (response.ok) {
-        setIsLoggedIn(true);
+        // Mettre à jour l'utilisateur et le token
         setUser(data);
         setToken(data.token.data);
+        setIsLoggedIn(true);
+
+        // Stocker le token dans localStorage avec expiration
+        setWithExpiry('TOKEN', data.token.data, data.token.expiresIn);
+
         console.log(`Connexion réussie en tant que ${userType}`);
 
         if (!userType) {
@@ -62,8 +66,8 @@ export const AuthProvider = ({ children }) => {
         }
 
         if (userType === 'admin') {
-          console.log('Redirection vers /admin/dashboard');
-          navigate('/admin/dashboard');
+          console.log('Redirection vers /admin/dashboard?section=users');
+          navigate('/admin/dashboard?section=users'); // Rediriger vers la section utilisateurs
         } else if (userType === 'parent') {
           console.log('Redirection vers /parent/dashboard');
           navigate('/parent/dashboard');
@@ -83,6 +87,7 @@ export const AuthProvider = ({ children }) => {
     setUserType(null);
     setUser(null);
     setToken(null);
+    localStorage.removeItem('TOKEN');
     navigate('/user-type-select');
   };
 

@@ -1,16 +1,18 @@
 import { useState } from 'react';
-import { LayoutDashboard, Users, BarChart2, Bus, Bell, LogOut, ChevronRight, ChevronLeft } from 'lucide-react';
+import { MapPin, Users, BarChart2, Bus, Bell, LogOut, ChevronRight, ChevronLeft, CarFront} from 'lucide-react';
 
 export default function Sidebar({ onSectionChange }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeMenu, setActiveMenu] = useState('dashboard');
 
   const menuItems = [
-    { id: 'dashboard', icon: LayoutDashboard, label: 'Tableau de bord' },
+    { id: 'dashboard', icon: MapPin, label: 'Localisation' },
     { id: 'users', icon: Users, label: 'Utilisateurs' },
+    { id: 'drivers', icon: CarFront, label: 'Conducteurs'},
     { id: 'buses', icon: Bus, label: 'Bus' },
     { id: 'stats', icon: BarChart2, label: 'Statistiques' },
     { id: 'notifications', icon: Bell, label: 'Alertes' },
+  
   ];
 
   return (

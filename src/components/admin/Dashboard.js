@@ -1,54 +1,83 @@
+import { Eye, EyeOff } from 'lucide-react';
 import Sidebar from '../common/Sidebar';
 import MapSection from './MapSection';
 import StatsSection from './StatsSection';
 import { useState, useEffect } from 'react';
-import { getWithExpiry } from '../../utils/localstorage'; // Assurez-vous que localstorage.js est dans src/utils/
-import { useNavigate } from 'react-router-dom'; // Importation corrigée pour useNavigate
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function AdminDashboard({ _userId }) {
-  const [activeSection, setActiveSection] = useState('dashboard');
+  const { token, user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const queryParams = new URLSearchParams(location.search);
+  const initialSection = queryParams.get('section') || 'location';
+
+  const [activeSection, setActiveSection] = useState('location');
   const [users, setUsers] = useState([]);
   const [buses, setBuses] = useState([]);
-  const [showForm, setShowForm] = useState({ users: false, buses: false });
-  const [newUser, setNewUser] = useState({ id: null, username: '', email: '', role: '', cinNumber: '', password: '', licenseNumber: '' });
-  const [newBus, setNewBus] = useState({ id: null, busNumber: '', route: '', driver: '', temperature: '', humidity: '', pression: '', flame: false, latitude: '', longitude: '', positionId: '' });
+  const [drivers, setDrivers] = useState([]);
+  const [showForm, setShowForm] = useState({ users: false, buses: false, drivers: false });
+  const [newUser, setNewUser] = useState({ id: null, username: '', email: '', role: 'parent', cinNumber: '', password: '' });
+  const [newBus, setNewBus] = useState({ id: null, busNumber: '', route: '', driver: '', temperature: '', humidity: '', pression: '', flame: false, latitude: '', longitude: ''});
+  const [newDriver, setNewDriver] = useState({ id: null, username: '', email: '', cinNumber: '', phoneNumber: '' });
   const [options, setOptions] = useState([]);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [opening, setOpening] = useState(false);
-  const navigate = useNavigate();
+  const [showPassword, setShowPassword] = useState(false);
 
-  // Charger les utilisateurs au démarrage
+  useEffect(() => {
+    if (location.pathname === '/dashboard' && !queryParams.get('section')) {
+      setActiveSection('dashboard');
+      navigate('/dashboard?section=dashboard', { replace: true });
+    } else {
+      setActiveSection(initialSection);
+    }
+  }, [location, navigate, initialSection]);
+
   useEffect(() => {
     const fetchUsers = async () => {
+      if (!token) {
+        setErrorMsg('Token manquant, veuillez vous reconnecter');
+        navigate('/login');
+        return;
+      }
+
       try {
         const response = await fetch('http://localhost:5000/api/users', {
-          headers: { 'Authorization': 'Bearer ' + (getWithExpiry('TOKEN') || 'VOTRE_TOKEN_ICI') },
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
         });
+
         const data = await response.json();
         console.log('Fetched users:', data);
+
         if (response.ok) {
           setUsers(data.map(user => ({
             id: user._id,
             username: user.username,
             email: user.email,
             role: user.role,
-            cinNumber: user.myadmin || '',
-            password: '', // Masqué comme dans le backend
-            licenseNumber: user.role === 'conducteur' ? user.licenseNumber || '' : ''
-          })));
+            cinNumber: user.cinNumber || '',
+            password: '',
+          })).filter(user => user.role !== 'admin'));
         } else {
           console.error('Failed to fetch users:', data.message);
+          setErrorMsg(`Erreur: ${data.message || 'Impossible de charger les utilisateurs'}`);
         }
       } catch (error) {
         console.error('Error fetching users:', error.message);
+        setErrorMsg(`Erreur réseau: ${error.message}`);
       }
     };
-    fetchUsers();
-  }, []);
 
-  // Charger les bus au démarrage
+    fetchUsers();
+  }, [token, navigate]);
+
   useEffect(() => {
     const fetchBuses = async () => {
       try {
@@ -66,25 +95,64 @@ export default function AdminDashboard({ _userId }) {
             pression: bus.pression || '',
             flame: bus.flame || false,
             latitude: bus.latitude || '',
-            longitude: bus.longitude || '',
-            positionId: bus.positionId || ''
+            longitude: bus.longitude || ''
           })));
         } else {
           console.error('Failed to fetch buses:', data.message);
+          setErrorMsg(`Erreur: ${data.message || 'Impossible de charger les bus'}`);
         }
       } catch (error) {
         console.error('Error fetching buses:', error.message);
+        setErrorMsg(`Erreur réseau: ${error.message}`);
       }
     };
     fetchBuses();
   }, []);
 
-  // Charger les agences pour l'utilisateur
+  useEffect(() => {
+    const fetchDrivers = async () => {
+      if (!token) {
+        setErrorMsg('Token manquant, veuillez vous reconnecter');
+        navigate('/login');
+        return;
+      }
+
+      try {
+        const response = await fetch('http://localhost:5000/api/drivers', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        const data = await response.json();
+        console.log('Fetched drivers:', data);
+        if (response.ok) {
+          setDrivers(data.map(driver => ({
+            id: driver._id,
+            username: driver.username,
+            email: driver.email,
+            cinNumber: driver.cinNumber || '',
+            phoneNumber: driver.phoneNumber || ''
+          })));
+        } else if (response.status === 401) {
+          setErrorMsg('Non autorisé, veuillez vous reconnecter');
+          navigate('/login');
+        } else {
+          console.error('Failed to fetch drivers:', data.message);
+          setErrorMsg(`Erreur: ${data.message || 'Impossible de charger les conducteurs'}`);
+        }
+      } catch (error) {
+        console.error('Error fetching drivers:', error.message);
+        setErrorMsg(`Erreur réseau: ${error.message}`);
+      }
+    };
+    fetchDrivers();
+  }, [token, navigate]);
+
   useEffect(() => {
     const fetchAgencies = async () => {
       setLoading(true);
       try {
-        const token = getWithExpiry('TOKEN');
         if (!token) {
           setErrorMsg('Token expiré ou non trouvé');
           setOpening(true);
@@ -121,17 +189,24 @@ export default function AdminDashboard({ _userId }) {
         }
       } catch (error) {
         console.error('Error fetching agencies:', error.message);
+        setErrorMsg(`Erreur: ${error.message}`);
       } finally {
         setLoading(false);
       }
     };
     if (_userId) fetchAgencies();
-  }, [_userId]);
+  }, [_userId, token, navigate]);
 
   const handleSubmitUser = async (e) => {
     e.preventDefault();
-    if (!newUser.username || !newUser.email || !newUser.role || !newUser.cinNumber) {
+    if (!newUser.username || !newUser.email || !newUser.cinNumber || !newUser.password) {
       console.error('Tous les champs obligatoires sont requis');
+      setErrorMsg('Veuillez remplir tous les champs obligatoires (Nom, Email, Num CIN, Mot de passe)');
+      return;
+    }
+
+    if (user?.role === 'admin' && newUser.role !== 'parent') {
+      setErrorMsg('Seuls les utilisateurs de type "parent" peuvent être créés par un admin');
       return;
     }
 
@@ -139,14 +214,19 @@ export default function AdminDashboard({ _userId }) {
       username: newUser.username,
       email: newUser.email,
       role: newUser.role,
-      myadmin: newUser.cinNumber
+      cinNumber: newUser.cinNumber,
+      password: newUser.password,
     };
-    if (newUser.role === 'parent') userToAdd.password = newUser.password;
-    if (newUser.role === 'conducteur') userToAdd.licenseNumber = newUser.licenseNumber;
 
     console.log('Sending user data:', userToAdd);
 
     try {
+      if (!token) {
+        setErrorMsg('Token manquant, veuillez vous reconnecter');
+        navigate('/login');
+        return;
+      }
+
       const method = newUser.id ? 'PUT' : 'POST';
       const url = newUser.id 
         ? `http://localhost:5000/api/users/${newUser.id}`
@@ -154,7 +234,10 @@ export default function AdminDashboard({ _userId }) {
 
       const response = await fetch(url, {
         method: method,
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (getWithExpiry('TOKEN') || 'VOTRE_TOKEN_ICI') },
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(userToAdd),
       });
       console.log('Response status:', response.status);
@@ -168,9 +251,8 @@ export default function AdminDashboard({ _userId }) {
             username: data.username,
             email: data.email,
             role: data.role,
-            cinNumber: data.myadmin,
+            cinNumber: data.cinNumber || '',
             password: '',
-            licenseNumber: data.role === 'conducteur' ? data.licenseNumber || '' : ''
           } : user));
         } else {
           setUsers([...users, {
@@ -178,18 +260,20 @@ export default function AdminDashboard({ _userId }) {
             username: data.username,
             email: data.email,
             role: data.role,
-            cinNumber: data.myadmin,
+            cinNumber: data.cinNumber || '',
             password: '',
-            licenseNumber: data.role === 'conducteur' ? data.licenseNumber || '' : ''
           }]);
         }
-        setNewUser({ id: null, username: '', email: '', role: '', cinNumber: '', password: '', licenseNumber: '' });
+        setNewUser({ id: null, username: '', email: '', role: 'parent', cinNumber: '', password: '' });
         setShowForm({ ...showForm, users: false });
+        setErrorMsg('');
       } else {
         console.error('Failed to save user:', data.message);
+        setErrorMsg(`Erreur: ${data.message || 'Impossible d\'enregistrer l\'utilisateur'}`);
       }
     } catch (error) {
       console.error('Error saving user:', error.message);
+      setErrorMsg(`Erreur réseau: ${error.message}`);
     }
   };
 
@@ -197,20 +281,22 @@ export default function AdminDashboard({ _userId }) {
     e.preventDefault();
     if (!newBus.busNumber || !newBus.route) {
       console.error('Numéro de bus et Itinéraire sont requis');
+      setErrorMsg('Veuillez remplir le numéro de bus et l\'itinéraire');
       return;
     }
 
     const busToAdd = {
       uniqueId: newBus.busNumber,
       name: newBus.route,
+      driver: newBus.driver,
       temperature: newBus.temperature,
       humidity: newBus.humidity,
       pression: newBus.pression,
       flame: newBus.flame,
       latitude: newBus.latitude,
-      longitude: newBus.longitude,
-      positionId: newBus.positionId
+      longitude: newBus.longitude
     };
+
     console.log('Sending bus data:', busToAdd);
 
     try {
@@ -234,37 +320,110 @@ export default function AdminDashboard({ _userId }) {
             id: newBus.id,
             busNumber: data.uniqueId,
             route: data.name,
-            driver: newBus.driver,
+            driver: data.driver,
             temperature: data.temperature,
             humidity: data.humidity,
             pression: data.pression,
             flame: data.flame,
             latitude: data.latitude,
-            longitude: data.longitude,
-            positionId: data.positionId
+            longitude: data.longitude
           } : bus));
         } else {
           setBuses([...buses, {
             id: data._id,
             busNumber: data.uniqueId,
             route: data.name,
-            driver: newBus.driver,
+            driver: data.driver,
             temperature: data.temperature,
             humidity: data.humidity,
             pression: data.pression,
             flame: data.flame,
             latitude: data.latitude,
-            longitude: data.longitude,
-            positionId: data.positionId
+            longitude: data.longitude
           }]);
         }
-        setNewBus({ id: null, busNumber: '', route: '', driver: '', temperature: '', humidity: '', pression: '', flame: false, latitude: '', longitude: '', positionId: '' });
+        setNewBus({ id: null, busNumber: '', route: '', driver: '', temperature: '', humidity: '', pression: '', flame: false, latitude: '', longitude: '' });
         setShowForm({ ...showForm, buses: false });
+        setErrorMsg('');
       } else {
         console.error('Failed to save bus:', data.message);
+        setErrorMsg(`Erreur: ${data.message || 'Impossible d\'enregistrer le bus'}`);
       }
     } catch (error) {
       console.error('Error saving bus:', error.message);
+      setErrorMsg(`Erreur réseau: ${error.message}`);
+    }
+  };
+
+  const handleSubmitDriver = async (e) => {
+    e.preventDefault();
+    if (!newDriver.email || !newDriver.cinNumber) {
+      console.error('Email et Numéro CIN sont requis');
+      setErrorMsg('Veuillez remplir email et numéro de CIN');
+      return;
+    }
+
+    const driverToAdd = {
+      username: newDriver.username,
+      email: newDriver.email,
+      cinNumber: newDriver.cinNumber,
+      phoneNumber: newDriver.phoneNumber
+    };
+
+    console.log('Sending driver data:', driverToAdd);
+
+    try {
+      if (!token) {
+        setErrorMsg('Token manquant, veuillez vous reconnecter');
+        navigate('/login');
+        return;
+      }
+
+      const method = newDriver.id ? 'PUT' : 'POST';
+      const url = newDriver.id 
+        ? `http://localhost:5000/api/drivers/${newDriver.id}`
+        : 'http://localhost:5000/api/drivers';
+
+      const response = await fetch(url, {
+        method: method,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(driverToAdd),
+      });
+      console.log('Response status:', response.status);
+      const data = await response.json();
+      console.log('Response data:', data);
+
+      if (response.ok) {
+        if (newDriver.id) {
+          setDrivers(drivers.map(driver => driver.id === newDriver.id ? {
+            id: newDriver.id,
+            username: data.username,
+            email: data.email,
+            cinNumber: data.cinNumber,
+            phoneNumber: data.phoneNumber
+          } : driver));
+        } else {
+          setDrivers([...drivers, {
+            id: data._id,
+            username: data.username,
+            email: data.email,
+            cinNumber: data.cinNumber,
+            phoneNumber: data.phoneNumber
+          }]);
+        }
+        setNewDriver({ id: null, username: '', email: '', cinNumber: '', phoneNumber: '' });
+        setShowForm({ ...showForm, drivers: false });
+        setErrorMsg('');
+      } else {
+        console.error('Failed to save driver:', data.message);
+        setErrorMsg(`Erreur: ${data.message || 'Impossible d\'enregistrer le conducteur'}`);
+      }
+    } catch (error) {
+      console.error('Error saving driver:', error.message);
+      setErrorMsg(`Erreur réseau: ${error.message}`);
     }
   };
 
@@ -276,7 +435,6 @@ export default function AdminDashboard({ _userId }) {
       role: user.role,
       cinNumber: user.cinNumber,
       password: user.password || '',
-      licenseNumber: user.role === 'conducteur' ? user.licenseNumber || '' : ''
     });
     setShowForm({ ...showForm, users: true });
   };
@@ -292,17 +450,27 @@ export default function AdminDashboard({ _userId }) {
       pression: bus.pression,
       flame: bus.flame,
       latitude: bus.latitude,
-      longitude: bus.longitude,
-      positionId: bus.positionId
+      longitude: bus.longitude
     });
     setShowForm({ ...showForm, buses: true });
+  };
+
+  const handleEditDriver = (driver) => {
+    setNewDriver({
+      id: driver.id,
+      username: driver.username,
+      email: driver.email,
+      cinNumber: driver.cinNumber,
+      phoneNumber: driver.phoneNumber
+    });
+    setShowForm({ ...showForm, drivers: true });
   };
 
   const handleDeleteUser = async (id) => {
     try {
       const response = await fetch(`http://localhost:5000/api/users/${id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': 'Bearer ' + (getWithExpiry('TOKEN') || 'VOTRE_TOKEN_ICI') },
+        headers: { 'Authorization': `Bearer ${token}` },
       });
       console.log('Delete response status:', response.status);
       const data = await response.json();
@@ -312,9 +480,11 @@ export default function AdminDashboard({ _userId }) {
         setUsers(users.filter(user => user.id !== id));
       } else {
         console.error('Failed to delete user:', data.message);
+        setErrorMsg(`Erreur: ${data.message || 'Impossible de supprimer l\'utilisateur'}`);
       }
     } catch (error) {
       console.error('Error deleting user:', error.message);
+      setErrorMsg(`Erreur réseau: ${error.message}`);
     }
   };
 
@@ -331,9 +501,33 @@ export default function AdminDashboard({ _userId }) {
         setBuses(buses.filter(bus => bus.id !== id));
       } else {
         console.error('Failed to delete bus:', data.message);
+        setErrorMsg(`Erreur: ${data.message || 'Impossible de supprimer le bus'}`);
       }
     } catch (error) {
       console.error('Error deleting bus:', error.message);
+      setErrorMsg(`Erreur réseau: ${error.message}`);
+    }
+  };
+
+  const handleDeleteDriver = async (id) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/drivers/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }, // Add token for auth
+      });
+      console.log('Delete response status:', response.status);
+      const data = await response.json();
+      console.log('Delete response data:', data);
+
+      if (response.ok) {
+        setDrivers(drivers.filter(driver => driver.id !== id));
+      } else {
+        console.error('Failed to delete driver:', data.message);
+        setErrorMsg(`Erreur: ${data.message || 'Impossible de supprimer le conducteur'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting driver:', error.message);
+      setErrorMsg(`Erreur réseau: ${error.message}`);
     }
   };
 
@@ -343,7 +537,13 @@ export default function AdminDashboard({ _userId }) {
       setNewUser({ ...newUser, [name]: value });
     } else if (type === 'bus') {
       setNewBus({ ...newBus, [name]: inputType === 'checkbox' ? checked : value });
+    } else if (type === 'driver') {
+      setNewDriver({ ...newDriver, [name]: value });
     }
+  };
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
   };
 
   return (
@@ -354,7 +554,7 @@ export default function AdminDashboard({ _userId }) {
         <header className="bg-white shadow-sm">
           <div className="w-full mx-auto py-4 px-4 sm:px-6 lg:px-8">
             <h1 className="text-2xl font-bold text-gray-900">
-              {activeSection === 'dashboard' ? 'Tableau de bord' : activeSection === 'users' ? 'Utilisateurs' : activeSection === 'buses' ? 'Bus' : 'Statistiques'}
+              {activeSection === 'dashboard' ? 'Tableau de bord' : activeSection === 'users' ? 'Utilisateurs' : activeSection === 'buses' ? 'Bus' : activeSection === 'drivers' ? 'Conducteurs' : 'Statistiques'}
             </h1>
           </div>
         </header>
@@ -368,15 +568,21 @@ export default function AdminDashboard({ _userId }) {
                 <h2 className="text-lg font-semibold text-gray-800">Liste des utilisateurs</h2>
                 <button
                   onClick={() => {
-                    setNewUser({ id: null, username: '', email: '', role: '', cinNumber: '', password: '', licenseNumber: '' });
+                    setNewUser({ id: null, username: '', email: '', role: 'parent', cinNumber: '', password: '' });
                     setShowForm({ ...showForm, users: true });
                   }}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
                 >
                   + Ajouter
                 </button>
               </div>
               
+              {errorMsg && (
+                <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded mb-4">
+                  {errorMsg}
+                </div>
+              )}
+
               {showForm.users && (
                 <div className="p-4 border-b border-gray-100">
                   <form onSubmit={handleSubmitUser} className="space-y-4">
@@ -390,11 +596,10 @@ export default function AdminDashboard({ _userId }) {
                         value={newUser.role}
                         onChange={(e) => handleInputChange(e, 'user')}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        disabled={user?.role === 'admin'}
                         required
                       >
-                        <option value="">Sélectionner un rôle</option>
                         <option value="parent">Parent</option>
-                        <option value="conducteur">Conducteur</option>
                       </select>
                     </div>
                     <div>
@@ -404,7 +609,7 @@ export default function AdminDashboard({ _userId }) {
                       <input
                         id="cinNumber"
                         name="cinNumber"
-                        type="text"
+                        type="number"
                         placeholder="Num CIN"
                         value={newUser.cinNumber}
                         onChange={(e) => handleInputChange(e, 'user')}
@@ -442,40 +647,28 @@ export default function AdminDashboard({ _userId }) {
                         required
                       />
                     </div>
-                    {newUser.role === 'parent' && (
-                      <div>
-                        <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="password">
-                          Mot de passe
-                        </label>
-                        <input
-                          id="password"
-                          name="password"
-                          type="password"
-                          placeholder="Mot de passe"
-                          value={newUser.password}
-                          onChange={(e) => handleInputChange(e, 'user')}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          required
-                        />
-                      </div>
-                    )}
-                    {newUser.role === 'conducteur' && (
-                      <div>
-                        <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="licenseNumber">
-                          Numéro de permis
-                        </label>
-                        <input
-                          id="licenseNumber"
-                          name="licenseNumber"
-                          type="text"
-                          placeholder="Numéro de permis"
-                          value={newUser.licenseNumber}
-                          onChange={(e) => handleInputChange(e, 'user')}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          required
-                        />
-                      </div>
-                    )}
+                    <div className="relative">
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="password">
+                        Mot de passe
+                      </label>
+                      <input
+                        id="password"
+                        name="password"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Mot de passe"
+                        value={newUser.password}
+                        onChange={(e) => handleInputChange(e, 'user')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={togglePasswordVisibility}
+                        className="absolute right-2 top-8 text-gray-500 hover:text-gray-700"
+                      >
+                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                      </button>
+                    </div>
                     <div className="flex space-x-2">
                       <button
                         type="submit"
@@ -509,9 +702,9 @@ export default function AdminDashboard({ _userId }) {
                         Rôle
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Num CIN
+                        Numéro Cin
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
@@ -523,19 +716,21 @@ export default function AdminDashboard({ _userId }) {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.email}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.role}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.cinNumber}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <button
-                            onClick={() => handleEditUser(user)}
-                            className="text-blue-600 hover:text-blue-800 mr-4"
-                          >
-                            Modifier
-                          </button>
-                          <button
-                            onClick={() => handleDeleteUser(user.id)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            Supprimer
-                          </button>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
+                          <div className="flex justify-center space-x-2">
+                            <button
+                              onClick={() => handleEditUser(user)}
+                              className="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                              Modifier
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(user.id)}
+                              className="bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                              Supprimer
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -551,15 +746,21 @@ export default function AdminDashboard({ _userId }) {
                 <h1 className="text-lg font-semibold text-gray-800">Liste des bus</h1>
                 <button
                   onClick={() => {
-                    setNewBus({ id: null, busNumber: '', route: '', driver: '', temperature: '', humidity: '', pression: '', flame: false, latitude: '', longitude: '', positionId: '' });
+                    setNewBus({ id: null, busNumber: '', route: '', driver: '', temperature: '', humidity: '', pression: '', flame: false, latitude: ''});
                     setShowForm({ ...showForm, buses: true });
                   }}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
                 >
                   + Ajouter
                 </button>
               </div>
               
+              {errorMsg && (
+                <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded mb-4">
+                  {errorMsg}
+                </div>
+              )}
+
               {showForm.buses && (
                 <div className="p-4 border-b border-gray-100">
                   <form onSubmit={handleSubmitBus} className="space-y-4">
@@ -690,20 +891,6 @@ export default function AdminDashboard({ _userId }) {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
-                    <div>
-                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="positionId">
-                        ID de position
-                      </label>
-                      <input
-                        id="positionId"
-                        name="positionId"
-                        type="text"
-                        placeholder="ID de position"
-                        value={newBus.positionId}
-                        onChange={(e) => handleInputChange(e, 'bus')}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
                     <div className="flex space-x-2">
                       <button
                         type="submit"
@@ -737,10 +924,10 @@ export default function AdminDashboard({ _userId }) {
                         Conducteur
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Température
+                        Temp
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Humidité
+                        Hum
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Pression
@@ -749,15 +936,12 @@ export default function AdminDashboard({ _userId }) {
                         Flamme
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Latitude
+                        Lat
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Longitude
+                        Long
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        ID de position
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
@@ -774,20 +958,174 @@ export default function AdminDashboard({ _userId }) {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.flame ? 'Oui' : 'Non'}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.latitude}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.longitude}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.positionId}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <button
-                            onClick={() => handleEditBus(bus)}
-                            className="text-blue-600 hover:text-blue-800 mr-4"
-                          >
-                            Modifier
-                          </button>
-                          <button
-                            onClick={() => handleDeleteBus(bus.id)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            Supprimer
-                          </button>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
+                          <div className="flex justify-center space-x-2">
+                            <button
+                              onClick={() => handleEditBus(bus)}
+                              className="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                              Modifier
+                            </button>
+                            <button
+                              onClick={() => handleDeleteBus(bus.id)}
+                              className="bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                              Supprimer
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {activeSection === 'drivers' && (
+            <div className="bg-white rounded-xl shadow-card overflow-hidden">
+              <div className="p-4 border-b border-gray-100 flex justify-between items-center">
+                <h1 className="text-lg font-semibold text-gray-800">Liste des conducteurs</h1>
+                <button
+                  onClick={() => {
+                    setNewDriver({ id: null, username: '', email: '', cinNumber: '', phoneNumber: '' });
+                    setShowForm({ ...showForm, drivers: true });
+                  }}
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  + Ajouter
+                </button>
+              </div>
+              
+              {errorMsg && (
+                <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded mb-4">
+                  {errorMsg}
+                </div>
+              )}
+
+              {showForm.drivers && (
+                <div className="p-4 border-b border-gray-100">
+                  <form onSubmit={handleSubmitDriver} className="space-y-4">
+                    <div>
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="username">
+                        Nom d'utilisateur
+                      </label>
+                      <input
+                        id="username"
+                        name="username"
+                        type="text"
+                        placeholder="Nom d'utilisateur"
+                        value={newDriver.username}
+                        onChange={(e) => handleInputChange(e, 'driver')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="email">
+                        Email
+                      </label>
+                      <input
+                        id="email"
+                        name="email"
+                        type="email"
+                        placeholder="Email"
+                        value={newDriver.email}
+                        onChange={(e) => handleInputChange(e, 'driver')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="cinNumber">
+                        Numéro du CIN
+                      </label>
+                      <input
+                        id="cinNumber"
+                        name="cinNumber"
+                        type="text"
+                        placeholder="Numéro du CIN"
+                        value={newDriver.cinNumber}
+                        onChange={(e) => handleInputChange(e, 'driver')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="phoneNumber">
+                        Téléphone
+                      </label>
+                      <input
+                        id="phoneNumber"
+                        name="phoneNumber"
+                        type="text"
+                        placeholder="Num téléphone"
+                        value={newDriver.phoneNumber}
+                        onChange={(e) => handleInputChange(e, 'driver')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="flex space-x-2">
+                      <button
+                        type="submit"
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        {newDriver.id ? 'Sauvegarder' : 'Ajouter'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowForm({ ...showForm, drivers: false })}
+                        className="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+                      >
+                        Annuler
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+              
+              <div className="p-4">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Nom d'utilisateur
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Email
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Num CIN
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Num téléphone
+                      </th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {drivers.map((driver) => (
+                      <tr key={driver.id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{driver.username}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{driver.email}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{driver.cinNumber}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{driver.phoneNumber}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
+                          <div className="flex justify-center space-x-2">
+                            <button
+                              onClick={() => handleEditDriver(driver)}
+                              className="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                              Modifier
+                            </button>
+                            <button
+                              onClick={() => handleDeleteDriver(driver.id)}
+                              className="bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                              Supprimer
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

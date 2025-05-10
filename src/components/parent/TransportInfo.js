@@ -3,8 +3,8 @@ export default function TransportInfo() {
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-medium mb-4">Informations du transport</h3>
-        <p className="mb-2"><strong>Ligne:</strong> Bus #5</p>
-        <p className="mb-2"><strong>Chauffeur:</strong> Mohamed Ben Ali</p>
+        <p className="mb-2"><strong>Ligne:</strong> Bus 1</p>
+        <p className="mb-2"><strong>Chauffeur:</strong> Med Hedi Hibar</p>
         <p className="mb-2"><strong>Heure de départ:</strong> 07:30</p>
         <p className="mb-2"><strong>Heure d'arrivée estimée:</strong> 08:15</p>
         <p className="mb-2 text-green-600 font-medium">En route - À l'heure</p>
