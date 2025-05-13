@@ -7,25 +7,57 @@ import { useNavigate } from 'react-router-dom';
 export default function LoginForm() {
   const { userType, setUserType, loginFormData, handleInputChange, handleLogin } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false); // État pour afficher/masquer le mot de passe
+  const [showPassword, setShowPassword] = useState(false);
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false); // État pour la modale
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState(''); // État pour l'email de réinitialisation
+  const [forgotPasswordMessage, setForgotPasswordMessage] = useState(''); // Message de succès/erreur
+  const [forgotPasswordError, setForgotPasswordError] = useState(''); // Erreur de réinitialisation
   const navigate = useNavigate();
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Simuler une requête réseau
     setTimeout(() => {
       handleLogin();
       setIsLoading(false);
     }, 800);
   };
 
+  const handleForgotPasswordSubmit = async (e) => {
+    e.preventDefault();
+    setForgotPasswordMessage('');
+    setForgotPasswordError('');
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('http://localhost:80/api/forgot-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: forgotPasswordEmail }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setForgotPasswordMessage('Un lien de réinitialisation a été envoyé à votre adresse e-mail.');
+        setForgotPasswordEmail(''); // Réinitialiser l'email
+      } else {
+        setForgotPasswordError(data.message || 'Erreur lors de l\'envoi de la demande de réinitialisation.');
+      }
+    } catch (error) {
+      setForgotPasswordError('Erreur réseau : ' + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const primaryColor = userType === 'admin' ? 'blue' : 'yellow';
   
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-cover bg-center">
-
       <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
         <div className="w-full max-w-md p-8 bg-white rounded-xl shadow-card">
           <button 
@@ -78,7 +110,7 @@ export default function LoginForm() {
                   className={`w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-${primaryColor}-500 focus:border-${primaryColor}-500 transition-colors`}
                   id="password"
                   name="password"
-                  type={showPassword ? 'text' : 'password'} // Basculer entre text et password
+                  type={showPassword ? 'text' : 'password'}
                   placeholder="Votre mot de passe"
                   value={loginFormData.password}
                   onChange={handleInputChange}
@@ -107,9 +139,13 @@ export default function LoginForm() {
                 </label>
               </div>
               
-              <a href="#" className={`text-sm text-${primaryColor}-600 hover:text-${primaryColor}-700`}>
-                Mot de passe oublié?
-              </a>
+              <button
+                type="button"
+                className={`text-sm text-${primaryColor}-600 hover:text-${primaryColor}-700`}
+                onClick={() => setShowForgotPasswordModal(true)}
+              >
+                Mot de passe oublié ?
+              </button>
             </div>
             
             <button
@@ -133,8 +169,76 @@ export default function LoginForm() {
           </form>
         </div>
         
+        {/* Modale pour "Mot de passe oublié ?" */}
+        {showForgotPasswordModal && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-card p-6 w-full max-w-sm">
+              <h3 className="text-lg font-bold mb-4 text-gray-800">Réinitialiser le mot de passe</h3>
+              <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="forgot-email">
+                    Adresse email
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Mail size={18} className="text-gray-400" />
+                    </div>
+                    <input
+                      className={`w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-${primaryColor}-500 focus:border-${primaryColor}-500 transition-colors`}
+                      id="forgot-email"
+                      name="forgot-email"
+                      type="email"
+                      placeholder="Votre email"
+                      value={forgotPasswordEmail}
+                      onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {forgotPasswordMessage && (
+                  <div className="p-3 bg-green-100 border border-green-400 text-green-700 rounded">
+                    {forgotPasswordMessage}
+                  </div>
+                )}
+
+                {forgotPasswordError && (
+                  <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                    {forgotPasswordError}
+                  </div>
+                )}
+
+                <div className="flex space-x-2">
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className={`w-full py-2 px-4 rounded-lg text-white font-medium flex items-center justify-center
+                      ${userType === 'admin' 
+                        ? 'bg-blue-600 hover:bg-blue-700' 
+                        : 'bg-yellow-600 hover:bg-yellow-700'
+                      } transition-colors`}
+                  >
+                    {isLoading ? (
+                      <div className="spinner border-2 w-5 h-5"></div>
+                    ) : (
+                      'Envoyer le lien'
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPasswordModal(false)}
+                    className="w-full py-2 px-4 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300 transition-colors"
+                  >
+                    Annuler
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         <p className="mt-8 text-sm text-gray-500">© 2025 Bus Scolaire Intelligent. Tous droits réservés.</p>
-        </div>
       </div>
+    </div>
   );
 }

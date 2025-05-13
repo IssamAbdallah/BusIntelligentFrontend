@@ -20,7 +20,7 @@ export default function AdminDashboard({ _userId }) {
   const [drivers, setDrivers] = useState([]);
   const [showForm, setShowForm] = useState({ users: false, buses: false, drivers: false });
   const [newUser, setNewUser] = useState({ id: null, username: '', email: '', role: 'parent', cinNumber: '', password: '' });
-  const [newBus, setNewBus] = useState({ id: null, busNumber: '', route: '', driver: '', temperature: '', humidity: '', pression: '', flame: false, latitude: '', longitude: ''});
+  const [newBus, setNewBus] = useState({ id: null, busNumber: '', route: '', driver: '', temperature: '', humidity: '', pression: '', flame: false, latitude: '', longitude: '' });
   const [newDriver, setNewDriver] = useState({ id: null, username: '', email: '', cinNumber: '', phoneNumber: '' });
   const [options, setOptions] = useState([]);
   const [items, setItems] = useState([]);
@@ -47,7 +47,7 @@ export default function AdminDashboard({ _userId }) {
       }
 
       try {
-        const response = await fetch('http://localhost:5000/api/users', {
+        const response = await fetch('http://localhost:80/api/users', {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -81,7 +81,11 @@ export default function AdminDashboard({ _userId }) {
   useEffect(() => {
     const fetchBuses = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/vehicles');
+        const response = await fetch('http://localhost:80/api/vehicles', {
+          headers: {
+            Authorization: `Bearer ${token}`, // Ajout du token
+          },
+        });
         const data = await response.json();
         console.log('Fetched buses:', data);
         if (response.ok) {
@@ -107,7 +111,7 @@ export default function AdminDashboard({ _userId }) {
       }
     };
     fetchBuses();
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     const fetchDrivers = async () => {
@@ -118,7 +122,7 @@ export default function AdminDashboard({ _userId }) {
       }
 
       try {
-        const response = await fetch('http://localhost:5000/api/drivers', {
+        const response = await fetch('http://localhost:80/api/drivers', {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -229,8 +233,8 @@ export default function AdminDashboard({ _userId }) {
 
       const method = newUser.id ? 'PUT' : 'POST';
       const url = newUser.id 
-        ? `http://localhost:5000/api/users/${newUser.id}`
-        : 'http://localhost:5000/api/users';
+        ? `http://localhost:80/api/users/${newUser.id}`
+        : 'http://localhost:80/api/users';
 
       const response = await fetch(url, {
         method: method,
@@ -302,12 +306,15 @@ export default function AdminDashboard({ _userId }) {
     try {
       const method = newBus.id ? 'PUT' : 'POST';
       const url = newBus.id 
-        ? `http://localhost:5000/api/vehicles/${newBus.id}`
-        : 'http://localhost:5000/api/vehicles';
+        ? `http://localhost:80/api/vehicles/${newBus.id}`
+        : 'http://localhost:80/api/vehicles';
 
       const response = await fetch(url, {
         method: method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // Ajout du token
+        },
         body: JSON.stringify(busToAdd),
       });
       console.log('Response status:', response.status);
@@ -381,8 +388,8 @@ export default function AdminDashboard({ _userId }) {
 
       const method = newDriver.id ? 'PUT' : 'POST';
       const url = newDriver.id 
-        ? `http://localhost:5000/api/drivers/${newDriver.id}`
-        : 'http://localhost:5000/api/drivers';
+        ? `http://localhost:80/api/drivers/${newDriver.id}`
+        : 'http://localhost:80/api/drivers';
 
       const response = await fetch(url, {
         method: method,
@@ -468,7 +475,7 @@ export default function AdminDashboard({ _userId }) {
 
   const handleDeleteUser = async (id) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/users/${id}`, {
+      const response = await fetch(`http://localhost:80/api/users/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
       });
@@ -490,8 +497,9 @@ export default function AdminDashboard({ _userId }) {
 
   const handleDeleteBus = async (id) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/vehicles/${id}`, {
+      const response = await fetch(`http://localhost:80/api/vehicles/${id}`, {
         method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }, // Ajout du token
       });
       console.log('Delete response status:', response.status);
       const data = await response.json();
@@ -511,9 +519,9 @@ export default function AdminDashboard({ _userId }) {
 
   const handleDeleteDriver = async (id) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/drivers/${id}`, {
+      const response = await fetch(`http://localhost:80/api/drivers/${id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }, // Add token for auth
+        headers: { 'Authorization': `Bearer ${token}` },
       });
       console.log('Delete response status:', response.status);
       const data = await response.json();
@@ -560,7 +568,16 @@ export default function AdminDashboard({ _userId }) {
         </header>
         
         <main className="flex-1 w-full px-4 sm:px-6 lg:px-8">
-          {activeSection === 'dashboard' && <MapSection />}
+          {activeSection === 'dashboard' && (
+            <MapSection
+              bus={buses.map(bus => ({
+                id: bus.id,
+                uniqueId: bus.busNumber,
+                latitude: bus.latitude,
+                longitude: bus.longitude,
+              }))}
+            />
+          )}
           
           {activeSection === 'users' && (
             <div className="bg-white rounded-xl shadow-card overflow-hidden">

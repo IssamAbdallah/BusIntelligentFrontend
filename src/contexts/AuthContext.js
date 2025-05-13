@@ -30,7 +30,7 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('Envoi de la requête API avec :', { email: loginFormData.email, password: loginFormData.password, userType });
 
-      const response = await fetch('http://localhost:5000/api/session', {
+      const response = await fetch('http://localhost:80/api/session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
