@@ -1,47 +1,42 @@
-// Importation des composants nécessaires depuis react-leaflet
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
-// Importation de Leaflet pour gérer les icônes
 import L from 'leaflet';
-// Hooks React pour la gestion d'état et d'effet
 import React, { useEffect, useState } from 'react';
-// Importation du CSS de Leaflet pour le style de la carte
 import 'leaflet/dist/leaflet.css';
+import { useAuth } from '../../contexts/AuthContext';
+import { v4 as uuidv4 } from 'uuid';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
-// Définition d’une icône personnalisée pour les arrêts (petite icône noire)
+// Icônes personnalisées
 const customIcon = new L.Icon({
   iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
   iconSize: [25, 25],
 });
 
-// Définition d’une icône pour le bus (icône de bus)
 const busIcon = new L.Icon({
   iconUrl: 'https://cdn-icons-png.flaticon.com/512/1068/1068631.png',
   iconSize: [30, 30],
 });
 
-// Fonction utilitaire pour calculer la distance entre deux points GPS (formule de Haversine)
+// Fonction utilitaire pour calculer la distance (Haversine)
 function haversineDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371000; // Rayon de la Terre en mètres
-  const toRad = x => (x * Math.PI) / 180; // Conversion degrés → radians
+  const R = 6371000;
+  const toRad = (x) => (x * Math.PI) / 180;
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c; // Distance en mètres
+  return R * c;
 }
 
-// Fonction pour interpoler une position entre deux points en fonction d’un ratio (pour simuler le déplacement du bus)
+// Fonction pour interpoler les coordonnées
 function interpolateCoords(lat1, lon1, lat2, lon2, distRatio) {
-  return [
-    lat1 + (lat2 - lat1) * distRatio,
-    lon1 + (lon2 - lon1) * distRatio,
-  ];
+  return [lat1 + (lat2 - lat1) * distRatio, lon1 + (lon2 - lon1) * distRatio];
 }
 
-// Coordonnées GPS pour le trajet 1 (liste des arrêts)
+// Données des trajets
 const trajet1 = [
   [35.6212102, 10.759478],
   [35.6301472, 10.7469969],
@@ -51,7 +46,6 @@ const trajet1 = [
   [35.7151908, 10.6726028],
 ];
 
-// Noms correspondants aux arrêts de trajet1
 const noms1 = [
   'Départ : Boulangerie Ben Ticha',
   'Arrêt 1 : Carrefour Market Jemmel',
@@ -61,7 +55,6 @@ const noms1 = [
   'Arrivée : Société EMKA MED',
 ];
 
-// Coordonnées GPS pour le trajet 2 (un autre itinéraire)
 const trajet2 = [
   [35.6212102, 10.759478],
   [35.6332329, 10.7606344],
@@ -71,7 +64,6 @@ const trajet2 = [
   [35.7151908, 10.6726028],
 ];
 
-// Noms correspondants aux arrêts de trajet2
 const noms2 = [
   'Départ : Boulangerie Ben Ticha',
   'Arrêt 1 : جامع الامام سحنون',
@@ -81,54 +73,219 @@ const noms2 = [
   'Arrivée : Société EMKA MED',
 ];
 
-// Vitesse du bus en mètre par seconde (30 km/h)
-const speedMps = 8.33;
+const speedMps = 47.87; // Vitesse en mètres par seconde (80 km/h)
+const STOP_DURATION = 5000; // 5 secondes en millisecondes
 
-// Composant principal
-export default function BusMap() {
-  // Position actuelle du bus (initialement le premier arrêt)
+// Remplacez ces valeurs par les ObjectId réels de votre collection Trip
+const tripIdTrajet1 = '6824bf143a78e23e5b01d765'; // ObjectId pour Trajet 1
+const tripIdTrajet2 = '6824bf143a78e23e5b01d766'; // ObjectId pour Trajet 2
+
+export default function MapSection({ bus }) {
   const [busPos, setBusPos] = useState(trajet1[0]);
-  // Index du segment actuellement parcouru (de i à i+1)
   const [segmentIndex, setSegmentIndex] = useState(0);
-  // Progression sur le segment actuel en mètres
   const [segmentProgress, setSegmentProgress] = useState(0);
+  const [isStopped, setIsStopped] = useState(false);
+  const [stopTimer, setStopTimer] = useState(null);
+  const [currentTrajet, setCurrentTrajet] = useState('trajet1'); // État pour suivre le trajet actuel
+  const [savedStations, setSavedStations] = useState([]); // Stocke les stations enregistrées avec leur _id
+  const { token } = useAuth();
 
-  // useEffect pour animer le déplacement du bus
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const [lat1, lon1] = trajet1[segmentIndex];
-      const [lat2, lon2] = trajet1[segmentIndex + 1];
-      const dist = haversineDistance(lat1, lon1, lat2, lon2);
-      const progressMeters = segmentProgress + 20; // On avance de 20m par seconde
+  // Fonction pour formater l'heure au format HH:MM:SS
+  const formatTime = (date) => {
+    return date.toTimeString().split(' ')[0]; // Ex: "16:21:00"
+  };
 
-      if (progressMeters >= dist) {
-        // Si on atteint la fin du segment actuel
-        if (segmentIndex + 1 < trajet1.length - 1) {
-          // Passer au prochain segment
-          setSegmentIndex(segmentIndex + 1);
-          setSegmentProgress(0);
-          setBusPos([lat2, lon2]);
-        } else {
-          // Arrivée au dernier arrêt : on arrête l’intervalle
-          clearInterval(interval);
-        }
+  // Fonction pour enregistrer une station dans MongoDB (Stop)
+  const handleSaveStation = async (lat, lon, name) => {
+    if (!token) {
+      toast.error('Utilisateur non authentifié. Veuillez vous connecter.', {
+        position: 'top-right',
+      });
+      return null;
+    }
+
+    // Vérifier si la station existe déjà
+    const existingStation = savedStations.find(station => station.key === `${lat},${lon},${name}`);
+    if (existingStation) {
+      console.log('Station déjà enregistrée:', name);
+      return existingStation;
+    }
+
+    try {
+      console.log('Envoi de la requête Stop:', { stop_id: uuidv4(), stop_name: name, stop_lat: lat, stop_lon: lon });
+
+      const response = await fetch('http://localhost:80/api/stops', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          stop_id: uuidv4(),
+          stop_name: name,
+          stop_lat: lat,
+          stop_lon: lon,
+        }),
+      });
+
+      const data = await response.json();
+      console.log('Réponse de l\'API Stop:', data);
+
+      if (response.ok) {
+        toast.success('Station enregistrée avec succès !', {
+          position: 'top-right',
+        });
+        // Ajouter la station enregistrée avec son _id
+        setSavedStations((prev) => [...prev, { ...data, key: `${lat},${lon},${name}` }]);
+        return data;
       } else {
-        // Sinon, on calcule la nouvelle position interpolée
-        const ratio = progressMeters / dist;
-        const [lat, lon] = interpolateCoords(lat1, lon1, lat2, lon2, ratio);
-        setBusPos([lat, lon]);
-        setSegmentProgress(progressMeters);
+        toast.error(`Erreur lors de l'enregistrement de la station : ${data.message}`, {
+          position: 'top-right',
+        });
+        return null;
       }
-    }, 1000); // Exécuté chaque seconde
-    return () => clearInterval(interval); // Nettoyage si le composant se démonte
-  }, [segmentIndex, segmentProgress]); // Dépend des changements de segment ou de progression
+    } catch (error) {
+      console.error('Erreur réseau dans handleSaveStation:', error);
+      toast.error(`Erreur réseau : ${error.message}`, {
+        position: 'top-right',
+      });
+      return null;
+    }
+  };
 
-  // Fonction pour estimer le temps d’arrivée à un arrêt donné
+  // Fonction pour enregistrer un arrêt dans StopTime
+  const handleSaveStopTime = async (trip, stop, stop_sequence) => {
+    if (!token) {
+      toast.error('Utilisateur non authentifié. Veuillez vous connecter.', {
+        position: 'top-right',
+      });
+      return;
+    }
+
+    const now = new Date();
+    const arrival_time = formatTime(now);
+    const departure_time = formatTime(new Date(now.getTime() + STOP_DURATION));
+
+    try {
+      console.log('Envoi de la requête StopTime:', {
+        trip,
+        stop: stop._id,
+        arrival_time,
+        departure_time,
+        stop_sequence,
+      });
+
+      const response = await fetch('http://localhost:80/api/stoptimes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          trip,
+          stop: stop._id,
+          arrival_time,
+          departure_time,
+          stop_sequence,
+        }),
+      });
+
+      const data = await response.json();
+      console.log('Réponse de l\'API StopTime:', data);
+
+      if (response.ok) {
+        toast.success(`Arrêt à ${stop.stop_name} enregistré avec succès !`, {
+          position: 'top-right',
+        });
+      } else {
+        toast.error(`Erreur lors de l'enregistrement de l'arrêt : ${data.message}`, {
+          position: 'top-right',
+        });
+      }
+    } catch (error) {
+      console.error('Erreur réseau dans handleSaveStopTime:', error);
+      toast.error(`Erreur réseau : ${error.message}`, {
+        position: 'top-right',
+      });
+    }
+  };
+
+  // Logique de déplacement du bus
+  useEffect(() => {
+    let interval;
+    if (!isStopped) {
+      const trajets = currentTrajet === 'trajet1' ? trajet1 : trajet2.slice().reverse();
+      const noms = currentTrajet === 'trajet1' ? noms1 : noms2.slice().reverse();
+      const tripId = currentTrajet === 'trajet1' ? tripIdTrajet1 : tripIdTrajet2;
+
+      interval = setInterval(() => {
+        const [lat1, lon1] = trajets[segmentIndex];
+        const [lat2, lon2] = trajets[segmentIndex + 1];
+        const dist = haversineDistance(lat1, lon1, lat2, lon2);
+        const progressMeters = segmentProgress + speedMps;
+
+        if (progressMeters >= dist) {
+          // Arrivée à la station
+          setBusPos([lat2, lon2]);
+          setSegmentProgress(0);
+          setIsStopped(true);
+
+          const stopIndex = segmentIndex + 1;
+          if (stopIndex < trajets.length) {
+            handleSaveStation(trajets[stopIndex][0], trajets[stopIndex][1], noms[stopIndex]).then((stop) => {
+              if (stop) {
+                handleSaveStopTime(tripId, stop, stopIndex);
+              }
+            });
+          }
+
+          setStopTimer(
+            setTimeout(() => {
+              if (segmentIndex + 1 < trajets.length - 1) {
+                // Reprendre le mouvement après 5 secondes
+                setSegmentIndex(segmentIndex + 1);
+                setIsStopped(false);
+              } else if (currentTrajet === 'trajet1') {
+                // Fin de trajet1, passer à trajet2 (retour)
+                setCurrentTrajet('trajet2');
+                setSegmentIndex(0);
+                setBusPos(trajet2[trajet2.length - 1]); // Commencer à la dernière station de trajet2
+                setIsStopped(false);
+                toast.info('Début du trajet de retour via Trajet 2 !', {
+                  position: 'top-right',
+                });
+              } else {
+                // Fin de trajet2, trajet complet terminé
+                clearInterval(interval);
+                toast.info('Trajet aller-retour terminé !', {
+                  position: 'top-right',
+                });
+              }
+            }, STOP_DURATION)
+          );
+        } else {
+          // Déplacement entre les stations
+          const ratio = progressMeters / dist;
+          const [lat, lon] = interpolateCoords(lat1, lon1, lat2, lon2, ratio);
+          setBusPos([lat, lon]);
+          setSegmentProgress(progressMeters);
+        }
+      }, 1000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+      if (stopTimer) clearTimeout(stopTimer);
+    };
+  }, [segmentIndex, segmentProgress, isStopped, stopTimer, currentTrajet, token]);
+
+  // Calcul du temps estimé d'arrivée
   function getTimeToArrival(stopCoords) {
+    const trajets = currentTrajet === 'trajet1' ? trajet1 : trajet2.slice().reverse();
     let totalDist = 0;
     let found = false;
-    for (let i = segmentIndex; i < trajet1.length - 1; i++) {
-      const [start, end] = [trajet1[i], trajet1[i + 1]];
+    for (let i = segmentIndex; i < trajets.length - 1; i++) {
+      const [start, end] = [trajets[i], trajets[i + 1]];
       totalDist += haversineDistance(...start, ...end);
       if (end[0] === stopCoords[0] && end[1] === stopCoords[1]) {
         found = true;
@@ -136,49 +293,59 @@ export default function BusMap() {
       }
     }
     if (!found) return null;
-    totalDist -= segmentProgress; // On retire la distance déjà parcourue
-    const timeSeconds = totalDist / speedMps;
-    return Math.round(timeSeconds / 60); // Retour en minutes
+    totalDist -= segmentProgress;
+    const timeSeconds = totalDist / speedMps + (trajets.length - segmentIndex - 1) * (STOP_DURATION / 1000);
+    return Math.round(timeSeconds / 60);
   }
 
-  // Rendu du composant : la carte
+  // Trajets pour l'affichage
+  const trajet2Reversed = trajet2.slice().reverse();
+  const noms2Reversed = noms2.slice().reverse();
+
   return (
-    <MapContainer center={[35.67, 10.72]} zoom={12.5} className="h-screen w-full">
-      {/* Fond de carte OpenStreetMap */}
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+    <div>
+      <MapContainer center={[35.67, 10.72]} zoom={12.5} className="h-screen w-full">
+        <TileLayer
+          attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
 
-      {/* Marqueurs des arrêts pour le trajet 1 avec temps estimé */}
-      {trajet1.map((pos, i) => (
-        <Marker key={`t1-${i}`} position={pos} icon={customIcon}>
-          <Popup>
-            {noms1[i]}<br />
-            {/* Afficher temps estimé sauf pour le premier et le dernier */}
-            {i > 0 && i < trajet1.length
-              ? `Temps estimé: ${getTimeToArrival(pos) ?? '-'} min`
-              : ''}
-          </Popup>
+        {/* Marqueurs des arrêts pour le trajet 1 */}
+        {trajet1.map((pos, i) => (
+          <Marker key={`t1-${i}`} position={pos} icon={customIcon}>
+            <Popup>
+              {noms1[i]}
+              <br />
+              {currentTrajet === 'trajet1' && i > 0 && i < trajet1.length - 1
+                ? `Temps estimé: ${getTimeToArrival(pos) ?? '-'} min`
+                : ''}
+            </Popup>
+          </Marker>
+        ))}
+
+        {/* Marqueurs pour le trajet 2 (inversé pour le retour) */}
+        {trajet2Reversed.map((pos, i) => (
+          <Marker key={`t2-${i}`} position={pos} icon={customIcon}>
+            <Popup>
+              {noms2Reversed[i]}
+              <br />
+              {currentTrajet === 'trajet2' && i > 0 && i < trajet2Reversed.length - 1
+                ? `Temps estimé: ${getTimeToArrival(pos) ?? '-'} min`
+                : ''}
+            </Popup>
+          </Marker>
+        ))}
+
+        {/* Lignes des trajets */}
+        <Polyline positions={trajet1} pathOptions={{ color: 'blue', weight: 4 }} />
+        <Polyline positions={trajet2} pathOptions={{ color: 'orange', weight: 4 }} />
+
+        {/* Marqueur du bus */}
+        <Marker position={busPos} icon={busIcon}>
+          <Popup>Bus en mouvement ({currentTrajet === 'trajet1' ? 'Trajet 1 Aller' : 'Trajet 2 Retour'})</Popup>
         </Marker>
-      ))}
-
-      {/* Marqueurs pour le trajet 2 (sans estimation) */}
-      {trajet2.map((pos, i) => (
-        <Marker key={`t2-${i}`} position={pos} icon={customIcon}>
-          <Popup>{noms2[i]}</Popup>
-        </Marker>
-      ))}
-
-      {/* Ligne de trajet 1 en bleu */}
-      <Polyline positions={trajet1} pathOptions={{ color: 'blue', weight: 4 }} />
-      {/* Ligne de trajet 2 en orange */}
-      <Polyline positions={trajet2} pathOptions={{ color: 'orange', weight: 4 }} />
-
-      {/* Marqueur pour la position actuelle du bus */}
-      <Marker position={busPos} icon={busIcon}>
-        <Popup>Bus en mouvement (Trajet 1)</Popup>
-      </Marker>
-    </MapContainer>
+      </MapContainer>
+      <ToastContainer />
+    </div>
   );
 }

@@ -2,6 +2,8 @@ import { Eye, EyeOff } from 'lucide-react';
 import Sidebar from '../common/Sidebar';
 import MapSection from './MapSection';
 import StatsSection from './StatsSection';
+import StudentSection from './StudentSection';
+import AlertsSection from './AlertsSection'; // Import du nouveau composant
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -18,9 +20,10 @@ export default function AdminDashboard({ _userId }) {
   const [users, setUsers] = useState([]);
   const [buses, setBuses] = useState([]);
   const [drivers, setDrivers] = useState([]);
-  const [showForm, setShowForm] = useState({ users: false, buses: false, drivers: false });
-  const [newUser, setNewUser] = useState({ id: null, username: '', email: '', role: 'parent', cinNumber: '', password: '' });
-  const [newBus, setNewBus] = useState({ id: null, busNumber: '', route: '', driver: '', temperature: '', humidity: '', pression: '', flame: false, latitude: '', longitude: '' });
+  const [students, setStudents] = useState([]); // État pour les élèves
+  const [showForm, setShowForm] = useState({ users: false, buses: false, drivers: false, students: false });
+  const [newUser, setNewUser] = useState({ id: null, username: '', email: '', role: 'parent', cinNumber: '', phoneNumber: '', password: '' });
+  const [newBus, setNewBus] = useState({ id: null, busNumber: '', route: '', driver: '', latitude: '', longitude: '' });
   const [newDriver, setNewDriver] = useState({ id: null, username: '', email: '', cinNumber: '', phoneNumber: '' });
   const [options, setOptions] = useState([]);
   const [items, setItems] = useState([]);
@@ -63,6 +66,7 @@ export default function AdminDashboard({ _userId }) {
             email: user.email,
             role: user.role,
             cinNumber: user.cinNumber || '',
+            phoneNumber: user.phoneNumber || '', // Ajout du phoneNumber dans les données récupérées
             password: '',
           })).filter(user => user.role !== 'admin'));
         } else {
@@ -83,7 +87,7 @@ export default function AdminDashboard({ _userId }) {
       try {
         const response = await fetch('http://localhost:80/api/vehicles', {
           headers: {
-            Authorization: `Bearer ${token}`, // Ajout du token
+            Authorization: `Bearer ${token}`,
           },
         });
         const data = await response.json();
@@ -94,10 +98,6 @@ export default function AdminDashboard({ _userId }) {
             busNumber: bus.uniqueId,
             route: bus.name,
             driver: bus.driver || '',
-            temperature: bus.temperature || '',
-            humidity: bus.humidity || '',
-            pression: bus.pression || '',
-            flame: bus.flame || false,
             latitude: bus.latitude || '',
             longitude: bus.longitude || ''
           })));
@@ -203,9 +203,9 @@ export default function AdminDashboard({ _userId }) {
 
   const handleSubmitUser = async (e) => {
     e.preventDefault();
-    if (!newUser.username || !newUser.email || !newUser.cinNumber || !newUser.password) {
+    if (!newUser.username || !newUser.email || !newUser.cinNumber || !newUser.phoneNumber || !newUser.password) {
       console.error('Tous les champs obligatoires sont requis');
-      setErrorMsg('Veuillez remplir tous les champs obligatoires (Nom, Email, Num CIN, Mot de passe)');
+      setErrorMsg('Veuillez remplir tous les champs obligatoires (Nom, Email, Num CIN, Téléphone, Mot de passe)');
       return;
     }
 
@@ -219,6 +219,7 @@ export default function AdminDashboard({ _userId }) {
       email: newUser.email,
       role: newUser.role,
       cinNumber: newUser.cinNumber,
+      phoneNumber: newUser.phoneNumber, // Ajout du phoneNumber dans l'objet envoyé
       password: newUser.password,
     };
 
@@ -256,6 +257,7 @@ export default function AdminDashboard({ _userId }) {
             email: data.email,
             role: data.role,
             cinNumber: data.cinNumber || '',
+            phoneNumber: data.phoneNumber || '', // Mise à jour du phoneNumber
             password: '',
           } : user));
         } else {
@@ -265,10 +267,11 @@ export default function AdminDashboard({ _userId }) {
             email: data.email,
             role: data.role,
             cinNumber: data.cinNumber || '',
+            phoneNumber: data.phoneNumber || '', // Ajout du phoneNumber
             password: '',
           }]);
         }
-        setNewUser({ id: null, username: '', email: '', role: 'parent', cinNumber: '', password: '' });
+        setNewUser({ id: null, username: '', email: '', role: 'parent', cinNumber: '', phoneNumber: '', password: '' });
         setShowForm({ ...showForm, users: false });
         setErrorMsg('');
       } else {
@@ -293,10 +296,6 @@ export default function AdminDashboard({ _userId }) {
       uniqueId: newBus.busNumber,
       name: newBus.route,
       driver: newBus.driver,
-      temperature: newBus.temperature,
-      humidity: newBus.humidity,
-      pression: newBus.pression,
-      flame: newBus.flame,
       latitude: newBus.latitude,
       longitude: newBus.longitude
     };
@@ -313,7 +312,7 @@ export default function AdminDashboard({ _userId }) {
         method: method,
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` // Ajout du token
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(busToAdd),
       });
@@ -328,10 +327,6 @@ export default function AdminDashboard({ _userId }) {
             busNumber: data.uniqueId,
             route: data.name,
             driver: data.driver,
-            temperature: data.temperature,
-            humidity: data.humidity,
-            pression: data.pression,
-            flame: data.flame,
             latitude: data.latitude,
             longitude: data.longitude
           } : bus));
@@ -341,15 +336,11 @@ export default function AdminDashboard({ _userId }) {
             busNumber: data.uniqueId,
             route: data.name,
             driver: data.driver,
-            temperature: data.temperature,
-            humidity: data.humidity,
-            pression: data.pression,
-            flame: data.flame,
             latitude: data.latitude,
             longitude: data.longitude
           }]);
         }
-        setNewBus({ id: null, busNumber: '', route: '', driver: '', temperature: '', humidity: '', pression: '', flame: false, latitude: '', longitude: '' });
+        setNewBus({ id: null, busNumber: '', route: '', driver: '', latitude: '', longitude: '' });
         setShowForm({ ...showForm, buses: false });
         setErrorMsg('');
       } else {
@@ -364,9 +355,9 @@ export default function AdminDashboard({ _userId }) {
 
   const handleSubmitDriver = async (e) => {
     e.preventDefault();
-    if (!newDriver.email || !newDriver.cinNumber) {
-      console.error('Email et Numéro CIN sont requis');
-      setErrorMsg('Veuillez remplir email et numéro de CIN');
+    if (!newDriver.email || !newDriver.cinNumber || !newDriver.phoneNumber) { // Ajout de phoneNumber comme requis
+      console.error('Email, Numéro CIN et Téléphone sont requis');
+      setErrorMsg('Veuillez remplir email, numéro de CIN et téléphone');
       return;
     }
 
@@ -441,6 +432,7 @@ export default function AdminDashboard({ _userId }) {
       email: user.email,
       role: user.role,
       cinNumber: user.cinNumber,
+      phoneNumber: user.phoneNumber || '', // Ajout du phoneNumber lors de l'édition
       password: user.password || '',
     });
     setShowForm({ ...showForm, users: true });
@@ -452,10 +444,6 @@ export default function AdminDashboard({ _userId }) {
       busNumber: bus.busNumber,
       route: bus.route,
       driver: bus.driver,
-      temperature: bus.temperature,
-      humidity: bus.humidity,
-      pression: bus.pression,
-      flame: bus.flame,
       latitude: bus.latitude,
       longitude: bus.longitude
     });
@@ -499,7 +487,7 @@ export default function AdminDashboard({ _userId }) {
     try {
       const response = await fetch(`http://localhost:80/api/vehicles/${id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }, // Ajout du token
+        headers: { 'Authorization': `Bearer ${token}` },
       });
       console.log('Delete response status:', response.status);
       const data = await response.json();
@@ -562,7 +550,13 @@ export default function AdminDashboard({ _userId }) {
         <header className="bg-white shadow-sm">
           <div className="w-full mx-auto py-4 px-4 sm:px-6 lg:px-8">
             <h1 className="text-2xl font-bold text-gray-900">
-              {activeSection === 'dashboard' ? 'Tableau de bord' : activeSection === 'users' ? 'Utilisateurs' : activeSection === 'buses' ? 'Bus' : activeSection === 'drivers' ? 'Conducteurs' : 'Statistiques'}
+              {activeSection === 'dashboard' ? 'Tableau de bord' : 
+               activeSection === 'users' ? 'Utilisateurs' : 
+               activeSection === 'buses' ? 'Bus' : 
+               activeSection === 'drivers' ? 'Conducteurs' : 
+               activeSection === 'students' ? 'Élèves' : 
+               activeSection === 'stats' ? 'Statistiques' : 
+               activeSection === 'alerts' ? 'Alertes' : 'Alertes'} {/* Ajout du titre pour la section alertes */}
             </h1>
           </div>
         </header>
@@ -585,7 +579,7 @@ export default function AdminDashboard({ _userId }) {
                 <h2 className="text-lg font-semibold text-gray-800">Liste des utilisateurs</h2>
                 <button
                   onClick={() => {
-                    setNewUser({ id: null, username: '', email: '', role: 'parent', cinNumber: '', password: '' });
+                    setNewUser({ id: null, username: '', email: '', role: 'parent', cinNumber: '', phoneNumber: '', password: '' });
                     setShowForm({ ...showForm, users: true });
                   }}
                   className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
@@ -664,6 +658,21 @@ export default function AdminDashboard({ _userId }) {
                         required
                       />
                     </div>
+                    <div>
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="phoneNumber">
+                        Téléphone
+                      </label>
+                      <input
+                        id="phoneNumber"
+                        name="phoneNumber"
+                        type="text"
+                        placeholder="Numéro de téléphone"
+                        value={newUser.phoneNumber}
+                        onChange={(e) => handleInputChange(e, 'user')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
                     <div className="relative">
                       <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="password">
                         Mot de passe
@@ -721,6 +730,9 @@ export default function AdminDashboard({ _userId }) {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Numéro Cin
                       </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Téléphone
+                      </th>
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
                       </th>
@@ -733,6 +745,7 @@ export default function AdminDashboard({ _userId }) {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.email}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.role}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.cinNumber}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.phoneNumber}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
                           <div className="flex justify-center space-x-2">
                             <button
@@ -763,7 +776,7 @@ export default function AdminDashboard({ _userId }) {
                 <h1 className="text-lg font-semibold text-gray-800">Liste des bus</h1>
                 <button
                   onClick={() => {
-                    setNewBus({ id: null, busNumber: '', route: '', driver: '', temperature: '', humidity: '', pression: '', flame: false, latitude: ''});
+                    setNewBus({ id: null, busNumber: '', route: '', driver: '',latitude: ''});
                     setShowForm({ ...showForm, buses: true });
                   }}
                   className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
@@ -825,61 +838,7 @@ export default function AdminDashboard({ _userId }) {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
-                    <div>
-                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="temperature">
-                        Température
-                      </label>
-                      <input
-                        id="temperature"
-                        name="temperature"
-                        type="text"
-                        placeholder="Température"
-                        value={newBus.temperature}
-                        onChange={(e) => handleInputChange(e, 'bus')}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="humidity">
-                        Humidité
-                      </label>
-                      <input
-                        id="humidity"
-                        name="humidity"
-                        type="text"
-                        placeholder="Humidité"
-                        value={newBus.humidity}
-                        onChange={(e) => handleInputChange(e, 'bus')}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="pression">
-                        Pression
-                      </label>
-                      <input
-                        id="pression"
-                        name="pression"
-                        type="text"
-                        placeholder="Pression"
-                        value={newBus.pression}
-                        onChange={(e) => handleInputChange(e, 'bus')}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="flame">
-                        Flamme
-                      </label>
-                      <input
-                        id="flame"
-                        name="flame"
-                        type="checkbox"
-                        checked={newBus.flame}
-                        onChange={(e) => handleInputChange(e, 'bus')}
-                        className="w-5 h-5 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
+
                     <div>
                       <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="latitude">
                         Latitude
@@ -941,18 +900,6 @@ export default function AdminDashboard({ _userId }) {
                         Conducteur
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Temp
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Hum
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Pression
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Flamme
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Lat
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -969,10 +916,6 @@ export default function AdminDashboard({ _userId }) {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.busNumber}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.route}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.driver}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.temperature}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.humidity}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.pression}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.flame ? 'Oui' : 'Non'}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.latitude}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.longitude}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
@@ -1079,6 +1022,7 @@ export default function AdminDashboard({ _userId }) {
                         value={newDriver.phoneNumber}
                         onChange={(e) => handleInputChange(e, 'driver')}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
                       />
                     </div>
                     <div className="flex space-x-2">
@@ -1152,7 +1096,19 @@ export default function AdminDashboard({ _userId }) {
             </div>
           )}
           
+          {activeSection === 'students' && (
+            <StudentSection
+              token={token}
+              navigate={navigate}
+              users={users}
+              setErrorMsg={setErrorMsg}
+              students={students}
+              setStudents={setStudents}
+            />
+          )}
+
           {activeSection === 'stats' && <StatsSection />}
+          {activeSection === 'alerts' && <AlertsSection />} {/* Ajout du nouveau composant pour la section alertes */}
         </main>
       </div>
     </div>

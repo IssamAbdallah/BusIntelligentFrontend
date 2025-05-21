@@ -4,6 +4,8 @@ import UserTypeSelect from './components/auth/UserTypeSelect';
 import LoginForm from './components/auth/LoginForm';
 import AdminDashboard from './components/admin/Dashboard';
 import ParentDashboard from './components/parent/Dashboard';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // Composant principal qui détermine quelle page afficher
 function Main() {
@@ -24,6 +26,20 @@ export default function App() {
       <AuthProvider>
         <Main />
       </AuthProvider>
+      <div>
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
+    </div>
     </Router>
+    
   );
 }

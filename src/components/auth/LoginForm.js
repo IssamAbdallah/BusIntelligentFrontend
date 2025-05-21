@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 export default function LoginForm() {
-  const { userType, setUserType, loginFormData, handleInputChange, handleLogin } = useAuth();
+  const { userType, loginFormData, handleInputChange, handleLogin } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false); // État pour la modale

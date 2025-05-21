@@ -66,8 +66,8 @@ export const AuthProvider = ({ children }) => {
         }
 
         if (userType === 'admin') {
-          console.log('Redirection vers /admin/dashboard?section=users');
-          navigate('/admin/dashboard?section=users'); // Rediriger vers la section utilisateurs
+          console.log('Redirection vers /admin/dashboard');
+          navigate('/admin/dashboard?section=dashboard'); // Rediriger vers la section utilisateurs
         } else if (userType === 'parent') {
           console.log('Redirection vers /parent/dashboard');
           navigate('/parent/dashboard');
