@@ -3,7 +3,7 @@ import Sidebar from '../common/Sidebar';
 import MapSection from './MapSection';
 import StatsSection from './StatsSection';
 import StudentSection from './StudentSection';
-import AlertsSection from './AlertsSection'; // Import du nouveau composant
+import AlertsSection from './AlertsSection';
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -20,10 +20,10 @@ export default function AdminDashboard({ _userId }) {
   const [users, setUsers] = useState([]);
   const [buses, setBuses] = useState([]);
   const [drivers, setDrivers] = useState([]);
-  const [students, setStudents] = useState([]); // État pour les élèves
+  const [students, setStudents] = useState([]);
   const [showForm, setShowForm] = useState({ users: false, buses: false, drivers: false, students: false });
   const [newUser, setNewUser] = useState({ id: null, username: '', email: '', role: 'parent', cinNumber: '', phoneNumber: '', password: '' });
-  const [newBus, setNewBus] = useState({ id: null, busNumber: '', route: '', driver: '', latitude: '', longitude: '' });
+  const [newBus, setNewBus] = useState({ id: null, busNumber: '', route: '', drivers: [], latitude: '', longitude: '' });
   const [newDriver, setNewDriver] = useState({ id: null, username: '', email: '', cinNumber: '', phoneNumber: '' });
   const [options, setOptions] = useState([]);
   const [items, setItems] = useState([]);
@@ -66,7 +66,7 @@ export default function AdminDashboard({ _userId }) {
             email: user.email,
             role: user.role,
             cinNumber: user.cinNumber || '',
-            phoneNumber: user.phoneNumber || '', // Ajout du phoneNumber dans les données récupérées
+            phoneNumber: user.phoneNumber || '',
             password: '',
           })).filter(user => user.role !== 'admin'));
         } else {
@@ -97,7 +97,7 @@ export default function AdminDashboard({ _userId }) {
             id: bus._id,
             busNumber: bus.uniqueId,
             route: bus.name,
-            driver: bus.driver || '',
+            drivers: bus.drivers || [],
             latitude: bus.latitude || '',
             longitude: bus.longitude || ''
           })));
@@ -219,7 +219,7 @@ export default function AdminDashboard({ _userId }) {
       email: newUser.email,
       role: newUser.role,
       cinNumber: newUser.cinNumber,
-      phoneNumber: newUser.phoneNumber, // Ajout du phoneNumber dans l'objet envoyé
+      phoneNumber: newUser.phoneNumber,
       password: newUser.password,
     };
 
@@ -257,7 +257,7 @@ export default function AdminDashboard({ _userId }) {
             email: data.email,
             role: data.role,
             cinNumber: data.cinNumber || '',
-            phoneNumber: data.phoneNumber || '', // Mise à jour du phoneNumber
+            phoneNumber: data.phoneNumber || '',
             password: '',
           } : user));
         } else {
@@ -267,7 +267,7 @@ export default function AdminDashboard({ _userId }) {
             email: data.email,
             role: data.role,
             cinNumber: data.cinNumber || '',
-            phoneNumber: data.phoneNumber || '', // Ajout du phoneNumber
+            phoneNumber: data.phoneNumber || '',
             password: '',
           }]);
         }
@@ -286,16 +286,16 @@ export default function AdminDashboard({ _userId }) {
 
   const handleSubmitBus = async (e) => {
     e.preventDefault();
-    if (!newBus.busNumber || !newBus.route) {
-      console.error('Numéro de bus et Itinéraire sont requis');
-      setErrorMsg('Veuillez remplir le numéro de bus et l\'itinéraire');
+    if (!newBus.busNumber || !newBus.route || !newBus.drivers || newBus.drivers.length < 1 || newBus.drivers.length > 2) {
+      console.error('Numéro de bus, Itinéraire et 1 ou 2 conducteurs sont requis');
+      setErrorMsg('Veuillez remplir le numéro de bus, l\'itinéraire et sélectionner 1 ou 2 conducteurs');
       return;
     }
 
     const busToAdd = {
       uniqueId: newBus.busNumber,
       name: newBus.route,
-      driver: newBus.driver,
+      drivers: newBus.drivers,
       latitude: newBus.latitude,
       longitude: newBus.longitude
     };
@@ -311,7 +311,7 @@ export default function AdminDashboard({ _userId }) {
       const response = await fetch(url, {
         method: method,
         headers: { 
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json', 
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(busToAdd),
@@ -326,7 +326,7 @@ export default function AdminDashboard({ _userId }) {
             id: newBus.id,
             busNumber: data.uniqueId,
             route: data.name,
-            driver: data.driver,
+            drivers: data.drivers || [],
             latitude: data.latitude,
             longitude: data.longitude
           } : bus));
@@ -335,12 +335,12 @@ export default function AdminDashboard({ _userId }) {
             id: data._id,
             busNumber: data.uniqueId,
             route: data.name,
-            driver: data.driver,
+            drivers: data.drivers || [],
             latitude: data.latitude,
             longitude: data.longitude
           }]);
         }
-        setNewBus({ id: null, busNumber: '', route: '', driver: '', latitude: '', longitude: '' });
+        setNewBus({ id: null, busNumber: '', route: '', drivers: [], latitude: '', longitude: '' });
         setShowForm({ ...showForm, buses: false });
         setErrorMsg('');
       } else {
@@ -355,9 +355,9 @@ export default function AdminDashboard({ _userId }) {
 
   const handleSubmitDriver = async (e) => {
     e.preventDefault();
-    if (!newDriver.email || !newDriver.cinNumber || !newDriver.phoneNumber) { // Ajout de phoneNumber comme requis
-      console.error('Email, Numéro CIN et Téléphone sont requis');
-      setErrorMsg('Veuillez remplir email, numéro de CIN et téléphone');
+    if (!newDriver.username || !newDriver.email || !newDriver.cinNumber || !newDriver.phoneNumber) {
+      console.error('Nom, Email, Numéro CIN et Téléphone sont requis');
+      setErrorMsg('Veuillez remplir tous les champs (Nom, Email, Numéro CIN, Téléphone)');
       return;
     }
 
@@ -385,7 +385,7 @@ export default function AdminDashboard({ _userId }) {
       const response = await fetch(url, {
         method: method,
         headers: { 
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json', 
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(driverToAdd),
@@ -432,7 +432,7 @@ export default function AdminDashboard({ _userId }) {
       email: user.email,
       role: user.role,
       cinNumber: user.cinNumber,
-      phoneNumber: user.phoneNumber || '', // Ajout du phoneNumber lors de l'édition
+      phoneNumber: user.phoneNumber || '',
       password: user.password || '',
     });
     setShowForm({ ...showForm, users: true });
@@ -443,7 +443,7 @@ export default function AdminDashboard({ _userId }) {
       id: bus.id,
       busNumber: bus.busNumber,
       route: bus.route,
-      driver: bus.driver,
+      drivers: bus.drivers.map(driver => driver.cinNumber),
       latitude: bus.latitude,
       longitude: bus.longitude
     });
@@ -528,11 +528,20 @@ export default function AdminDashboard({ _userId }) {
   };
 
   const handleInputChange = (e, type) => {
-    const { name, value, type: inputType, checked } = e.target;
+    const { name, value, type: inputType, checked, selectedOptions } = e.target;
     if (type === 'user') {
       setNewUser({ ...newUser, [name]: value });
     } else if (type === 'bus') {
-      setNewBus({ ...newBus, [name]: inputType === 'checkbox' ? checked : value });
+      if (name === 'drivers') {
+        const selectedDrivers = Array.from(selectedOptions, option => option.value);
+        if (selectedDrivers.length <= 2) {
+          setNewBus({ ...newBus, drivers: selectedDrivers });
+        } else {
+          setErrorMsg('Vous ne pouvez sélectionner que 2 conducteurs maximum');
+        }
+      } else {
+        setNewBus({ ...newBus, [name]: inputType === 'checkbox' ? checked : value });
+      }
     } else if (type === 'driver') {
       setNewDriver({ ...newDriver, [name]: value });
     }
@@ -551,12 +560,12 @@ export default function AdminDashboard({ _userId }) {
           <div className="w-full mx-auto py-4 px-4 sm:px-6 lg:px-8">
             <h1 className="text-2xl font-bold text-gray-900">
               {activeSection === 'dashboard' ? 'Tableau de bord' : 
-               activeSection === 'users' ? 'Utilisateurs' : 
-               activeSection === 'buses' ? 'Bus' : 
-               activeSection === 'drivers' ? 'Conducteurs' : 
-               activeSection === 'students' ? 'Élèves' : 
-               activeSection === 'stats' ? 'Statistiques' : 
-               activeSection === 'alerts' ? 'Alertes' : 'Alertes'} {/* Ajout du titre pour la section alertes */}
+              activeSection === 'users' ? 'Parents' : 
+              activeSection === 'buses' ? 'Bus' : 
+              activeSection === 'drivers' ? 'Conducteurs' : 
+              activeSection === 'students' ? 'Élèves' : 
+              activeSection === 'stats' ? 'Statistiques' : 
+              activeSection === 'alerts' ? 'Alertes' : 'Alertes'}
             </h1>
           </div>
         </header>
@@ -576,7 +585,7 @@ export default function AdminDashboard({ _userId }) {
           {activeSection === 'users' && (
             <div className="bg-white rounded-xl shadow-card overflow-hidden">
               <div className="p-4 border-b border-gray-100 flex justify-between items-center">
-                <h2 className="text-lg font-semibold text-gray-800">Liste des utilisateurs</h2>
+                <h2 className="text-lg font-semibold text-gray-800">Liste des parents</h2>
                 <button
                   onClick={() => {
                     setNewUser({ id: null, username: '', email: '', role: 'parent', cinNumber: '', phoneNumber: '', password: '' });
@@ -776,7 +785,7 @@ export default function AdminDashboard({ _userId }) {
                 <h1 className="text-lg font-semibold text-gray-800">Liste des bus</h1>
                 <button
                   onClick={() => {
-                    setNewBus({ id: null, busNumber: '', route: '', driver: '',latitude: ''});
+                    setNewBus({ id: null, busNumber: '', route: '', drivers: [], latitude: '', longitude: '' });
                     setShowForm({ ...showForm, buses: true });
                   }}
                   className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
@@ -825,20 +834,29 @@ export default function AdminDashboard({ _userId }) {
                       />
                     </div>
                     <div>
-                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="driver">
-                        Conducteur
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="drivers">
+                        Conducteurs (CIN)
                       </label>
-                      <input
-                        id="driver"
-                        name="driver"
-                        type="text"
-                        placeholder="Conducteur"
-                        value={newBus.driver}
+                      <select
+                        id="drivers"
+                        name="drivers"
+                        multiple
+                        value={newBus.drivers}
                         onChange={(e) => handleInputChange(e, 'bus')}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 h-32"
+                        required
+                      >
+                        {drivers.length > 0 ? (
+                          drivers.map(driver => (
+                            <option key={driver.id} value={driver.cinNumber}>
+                              {driver.username} (CIN: {driver.cinNumber})
+                            </option>
+                          ))
+                        ) : (
+                          <option disabled>Aucun conducteur disponible</option>
+                        )}
+                      </select>
                     </div>
-
                     <div>
                       <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="latitude">
                         Latitude
@@ -897,7 +915,7 @@ export default function AdminDashboard({ _userId }) {
                         Itinéraire
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Conducteur
+                        Conducteurs
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Lat
@@ -915,7 +933,11 @@ export default function AdminDashboard({ _userId }) {
                       <tr key={bus.id}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.busNumber}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.route}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.driver}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {bus.drivers && bus.drivers.length > 0
+                            ? bus.drivers.map(driver => `${driver.username} (CIN: ${driver.cinNumber})`).join(', ')
+                            : 'Aucun conducteur'}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.latitude}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.longitude}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
@@ -978,6 +1000,7 @@ export default function AdminDashboard({ _userId }) {
                         value={newDriver.username}
                         onChange={(e) => handleInputChange(e, 'driver')}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
                       />
                     </div>
                     <div>
@@ -1099,16 +1122,19 @@ export default function AdminDashboard({ _userId }) {
           {activeSection === 'students' && (
             <StudentSection
               token={token}
-              navigate={navigate}
-              users={users}
               setErrorMsg={setErrorMsg}
               students={students}
               setStudents={setStudents}
             />
           )}
-
-          {activeSection === 'stats' && <StatsSection />}
-          {activeSection === 'alerts' && <AlertsSection />} {/* Ajout du nouveau composant pour la section alertes */}
+          
+          {activeSection === 'stats' && (
+            <StatsSection />
+          )}
+          
+          {activeSection === 'alerts' && (
+            <AlertsSection />
+          )}
         </main>
       </div>
     </div>

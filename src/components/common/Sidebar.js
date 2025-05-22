@@ -25,50 +25,38 @@ export default function Sidebar({ onSectionChange }) {
       icon: FaLocationDot, 
       label: 'Localisation', 
       count: null,
-      description: 'Vue en temps réel des véhicules',
       badge: { text: 'LIVE', color: 'green' }
     },
     { 
       id: 'users', 
       icon: FaUser, 
       label: 'Parents', 
-      count: 4,
-      description: 'Gestion des comptes parents'
     },
     { 
       id: 'students', 
       icon: FaUserGraduate, 
       label: 'Élèves', 
-      count: 5,
-      description: 'Liste et suivi des élèves',
     },
     { 
       id: 'drivers', 
       icon: FaCar, 
       label: 'Conducteurs', 
-      count: 1,
-      description: 'Équipe des conducteurs'
     },
     { 
       id: 'buses', 
       icon: FaBus, 
       label: 'Bus', 
-      count: 1,
-      description: 'Flotte de véhicules'
     },
     { 
       id: 'stats', 
       icon: IoStatsChartSharp, 
       label: 'Statistiques', 
       count: null,
-      description: 'Rapports et analyses'
     },
     { 
       id: 'alerts', 
       icon: IoNotifications, 
       label: 'Alertes', 
-      count: 1,
-      description: 'Notifications et alertes',
       badge: { text: 'URGENT', color: 'red' }
     },
   ];
@@ -115,7 +103,7 @@ export default function Sidebar({ onSectionChange }) {
           </div>
         ) : (
           <div className="w-10 h-10 mx-auto rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md">
-            <span className="font-bold text-white text-xl">ST</span>
+            <span className="font-bold text-white text-xl">BSI</span>
           </div>
         )}
         <button 
