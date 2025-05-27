@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { FaExclamationCircle, FaFire, FaComment } from 'react-icons/fa';
+import { FaExclamationCircle, FaComment } from 'react-icons/fa';
 import axios from 'axios';
 
 export default function AlertsSection() {
@@ -20,7 +20,6 @@ export default function AlertsSection() {
     temperature: 25, // °C (valeur statique entre -10 et 50°C)
     humidity: 60, // % (valeur statique entre 0 et 100%)
     pressure: 1013, // hPa (valeur statique entre 900 et 1100 hPa)
-    flameDetected: true, // true ou false pour la détection de flamme
   };
 
   // Simuler une récupération de données via API pour les alertes
@@ -196,7 +195,7 @@ export default function AlertsSection() {
 
       {/* Section des visualisations */}
       <h3 className="text-lg font-semibold mb-4 text-gray-800">Données du capteur</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Jauge de température (Aiguille) */}
         <div className="flex flex-col items-center">
           <div className="relative w-40 h-20">
@@ -280,22 +279,6 @@ export default function AlertsSection() {
           </div>
           <p className="mt-2 text-gray-700 font-medium">Pression: {staticData.pressure} hPa</p>
           <p className="text-xs text-gray-500">Plage: 900 à 1100 hPa</p>
-        </div>
-
-        {/* Indicateur de détection de flamme */}
-        <div className="flex flex-col items-center">
-          <div
-            className={`w-16 h-16 rounded-full flex items-center justify-center ${
-              staticData.flameDetected ? 'bg-red-500' : 'bg-green-500'
-            }`}
-          >
-            <FaFire
-              className={`text-3xl ${staticData.flameDetected ? 'text-white' : 'text-gray-200'}`}
-            />
-          </div>
-          <p className="mt-2 text-gray-700 font-medium">
-            Flamme: {staticData.flameDetected ? 'Détectée' : 'Non détectée'}
-          </p>
         </div>
       </div>
 

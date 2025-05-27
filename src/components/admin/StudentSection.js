@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export default function StudentSection({ token, navigate, users, setErrorMsg, students, setStudents }) {
+export default function StudentSection({ token, navigate, users = [], setErrorMsg, students, setStudents }) {
   const [showForm, setShowForm] = useState(false);
   const [newStudent, setNewStudent] = useState({
     id: null,
@@ -54,7 +54,9 @@ export default function StudentSection({ token, navigate, users, setErrorMsg, st
   }, [token, navigate, setErrorMsg, setStudents]);
 
   const countStudentsByParent = (cinParent) => {
-    return students.filter(student => student.cinParent === cinParent).length;
+    return students && Array.isArray(students)
+      ? students.filter(student => student.cinParent === cinParent).length
+      : 0;
   };
 
   const handleSubmitStudent = async (e) => {
@@ -65,7 +67,7 @@ export default function StudentSection({ token, navigate, users, setErrorMsg, st
       return;
     }
 
-    const parentExists = users.some(user => user.cinNumber === newStudent.cinParent && user.role === 'parent');
+    const parentExists = users.some(user => (user.cinNumber || user.cin) === newStudent.cinParent && user.role && user.role.toLowerCase().includes('parent'));
     if (!parentExists) {
       setErrorMsg('Le CIN du parent sélectionné n\'existe pas ou ne correspond pas à un parent.');
       return;
@@ -247,11 +249,24 @@ export default function StudentSection({ token, navigate, users, setErrorMsg, st
                 required
               >
                 <option value="">Sélectionner un parent</option>
-                {users.filter(user => user.role === 'parent').map(user => (
-                  <option key={user.id} value={user.cinNumber}>
-                    {user.username} (CIN: {user.cinNumber}) - {countStudentsByParent(user.cinNumber)} élève(s)
-                  </option>
-                ))}
+                {(() => {
+                  console.log('Valeur brute de users dans StudentSection:', users);
+                  const filteredParents = users && Array.isArray(users) ? users.filter(user => {
+                    const roleMatch = user.role && user.role.toLowerCase().includes('parent');
+                    console.log('Utilisateur filtré:', user, 'Role match:', roleMatch);
+                    return roleMatch;
+                  }) : [];
+                  console.log('Parents filtrés:', filteredParents);
+                  return filteredParents.length > 0 ? (
+                    filteredParents.map(user => (
+                      <option key={user._id || user.id} value={user.cinNumber || user.cin}>
+                        {user.username} (CIN: {user.cinNumber || user.cin}) - {countStudentsByParent(user.cinNumber || user.cin)} élève(s)
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>Aucun parent disponible</option>
+                  );
+                })()}
               </select>
             </div>
             <div>
@@ -331,32 +346,40 @@ export default function StudentSection({ token, navigate, users, setErrorMsg, st
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {students.map((student) => (
-              <tr key={student.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{student.username}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{student.badgeId}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{student.parent}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{student.cinParent}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{student.phoneParent}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{student.level}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
-                  <div className="flex justify-center space-x-2">
-                    <button
-                      onClick={() => handleEditStudent(student)}
-                      className="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      Modifier
-                    </button>
-                    <button
-                      onClick={() => handleDeleteStudent(student.id)}
-                      className="bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700 transition-colors"
-                    >
-                      Supprimer
-                    </button>
-                  </div>
+            {students && Array.isArray(students) ? (
+              students.map((student) => (
+                <tr key={student.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{student.username}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{student.badgeId}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{student.parent}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{student.cinParent}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{student.phoneParent}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{student.level}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
+                    <div className="flex justify-center space-x-2">
+                      <button
+                        onClick={() => handleEditStudent(student)}
+                        className="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        Modifier
+                      </button>
+                      <button
+                        onClick={() => handleDeleteStudent(student.id)}
+                        className="bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700 transition-colors"
+                      >
+                        Supprimer
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="7" className="px-6 py-4 text-center text-sm text-gray-500">
+                  Aucun élève disponible
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>

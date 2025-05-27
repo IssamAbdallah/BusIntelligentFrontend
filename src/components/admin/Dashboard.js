@@ -60,7 +60,7 @@ export default function AdminDashboard({ _userId }) {
         console.log('Fetched users:', data);
 
         if (response.ok) {
-          setUsers(data.map(user => ({
+          const mappedUsers = data.map(user => ({
             id: user._id,
             username: user.username,
             email: user.email,
@@ -68,7 +68,10 @@ export default function AdminDashboard({ _userId }) {
             cinNumber: user.cinNumber || '',
             phoneNumber: user.phoneNumber || '',
             password: '',
-          })).filter(user => user.role !== 'admin'));
+          })).filter(user => user.role !== 'admin');
+          setUsers(mappedUsers);
+          console.log('Mapped users (excluding admins):', mappedUsers);
+          console.log('Users with role "parent":', mappedUsers.filter(user => user.role && user.role.toLowerCase().includes('parent')));
         } else {
           console.error('Failed to fetch users:', data.message);
           setErrorMsg(`Erreur: ${data.message || 'Impossible de charger les utilisateurs'}`);
@@ -1122,6 +1125,8 @@ export default function AdminDashboard({ _userId }) {
           {activeSection === 'students' && (
             <StudentSection
               token={token}
+              navigate={navigate}
+              users={users} // Ajout de la prop users
               setErrorMsg={setErrorMsg}
               students={students}
               setStudents={setStudents}
