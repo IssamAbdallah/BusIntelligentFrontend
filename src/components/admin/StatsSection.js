@@ -312,7 +312,7 @@ export default function StatsSection() {
             <div className="flex items-center">
               <FaUserGraduate className="text-3xl mr-3" />
               <div>
-                <h3 className="text-2xl font-bold">Gestion des Élèves</h3>
+                <h3 className="text-2xl font-bold">Liste des Élèves</h3>
                 <p className="text-indigo-100">Suivi de présence en temps réel</p>
               </div>
             </div>

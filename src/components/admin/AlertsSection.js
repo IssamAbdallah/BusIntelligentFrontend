@@ -1,13 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { FaExclamationCircle, FaFire } from 'react-icons/fa';
+import { FaExclamationCircle, FaFire, FaComment } from 'react-icons/fa';
+import axios from 'axios';
 
 export default function AlertsSection() {
   // État pour les alertes
   const [alerts, setAlerts] = useState([
     { id: 1, message: 'Bus 1 en retard (15 min)', timestamp: '2025-05-15 09:30:00', read: false },
   ]);
+
+  // État pour les messages des parents
+  const [messages, setMessages] = useState([]);
+  const [replyContent, setReplyContent] = useState({});
+  const [sendingReply, setSendingReply] = useState({});
 
   // Données statiques pour les visualisations
   const staticData = {
@@ -17,11 +23,10 @@ export default function AlertsSection() {
     flameDetected: true, // true ou false pour la détection de flamme
   };
 
-  // Simuler une récupération de données via API (à remplacer par un vrai fetch)
+  // Simuler une récupération de données via API pour les alertes
   useEffect(() => {
     const fetchAlerts = async () => {
       try {
-        // Simuler une réponse API (à remplacer par une vraie requête)
         const response = [
           { id: 1, message: 'Bus 1 en retard (15 min)', timestamp: '2025-05-15 09:30:00', read: false },
         ];
@@ -35,6 +40,26 @@ export default function AlertsSection() {
     fetchAlerts();
   }, []);
 
+  // Récupérer les messages des parents via API
+  useEffect(() => {
+    const fetchMessages = async () => {
+      try {
+        const response = await axios.get('http://localhost:80/api/messages');
+        // Filtrer les messages des parents (exclure les réponses de l'admin)
+        const parentMessages = response.data.filter(msg => msg.sender.startsWith('Parent:') && !msg.parentMessageId);
+        setMessages(parentMessages);
+      } catch (error) {
+        console.error('Erreur lors de la récupération des messages:', error);
+        toast.error('Erreur lors de la récupération des messages.', { position: 'top-right' });
+      }
+    };
+
+    fetchMessages();
+    // Actualiser toutes les 30 secondes
+    const interval = setInterval(fetchMessages, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Fonction pour marquer une alerte comme lue
   const markAlertAsRead = (alertId) => {
     setAlerts((prevAlerts) =>
@@ -43,6 +68,33 @@ export default function AlertsSection() {
       )
     );
     toast.success('Alerte marquée comme lue.', { position: 'top-right' });
+  };
+
+  // Fonction pour envoyer une réponse de l'admin
+  const sendReply = async (messageId) => {
+    if (!replyContent[messageId]?.trim()) {
+      toast.error('Veuillez entrer un message de réponse.', { position: 'top-right' });
+      return;
+    }
+
+    setSendingReply((prev) => ({ ...prev, [messageId]: true }));
+    try {
+      await axios.post(`http://localhost:80/api/messages/${messageId}/reply`, {
+        content: replyContent[messageId],
+        sender: 'Admin',
+      });
+      toast.success('Réponse envoyée avec succès.', { position: 'top-right' });
+      // Actualiser les messages
+      const response = await axios.get('http://localhost:80/api/messages');
+      const parentMessages = response.data.filter(msg => msg.sender.startsWith('Parent:') && !msg.parentMessageId);
+      setMessages(parentMessages);
+      setReplyContent((prev) => ({ ...prev, [messageId]: '' }));
+    } catch (error) {
+      console.error('Erreur lors de l\'envoi de la réponse:', error);
+      toast.error('Erreur lors de l\'envoi de la réponse.', { position: 'top-right' });
+    } finally {
+      setSendingReply((prev) => ({ ...prev, [messageId]: false }));
+    }
   };
 
   // Calcul de l'angle de l'aiguille pour la température (plage: -10°C à 50°C)
@@ -89,8 +141,61 @@ export default function AlertsSection() {
         <p className="text-gray-500 mb-6">Aucune alerte récente.</p>
       )}
 
+      {/* Section des messages des parents */}
+      <h3 className="text-lg font-semibold mb-4 flex items-center text-blue-600">
+        <FaComment className="mr-2" /> Messages des parents
+      </h3>
+      {messages.length > 0 ? (
+        <ul className="space-y-4 max-h-40 overflow-y-auto mb-6">
+          {messages.map((message) => (
+            <li
+              key={message.id}
+              className={`p-3 rounded-lg ${
+                message.isRead ? 'bg-gray-100 text-gray-600' : 'bg-blue-50 text-blue-800'
+              }`}
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <span className="font-medium">{message.sender.replace('Parent:', '')}</span>
+                  <p className="text-sm">{message.content}</p>
+                  <p className="text-xs text-gray-500">{new Date(message.timestamp).toLocaleString()}</p>
+                </div>
+                {!message.isRead && (
+                  <button
+                    onClick={() => markAlertAsRead(message.id)}
+                    className="text-blue-500 hover:text-blue-700 text-sm"
+                    aria-label="Marquer le message comme lu"
+                  >
+                    Marquer comme lu
+                  </button>
+                )}
+              </div>
+              <div className="mt-2">
+                <textarea
+                  className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Tapez votre réponse..."
+                  value={replyContent[message.id] || ''}
+                  onChange={(e) =>
+                    setReplyContent((prev) => ({ ...prev, [message.id]: e.target.value }))
+                  }
+                />
+                <button
+                  className="mt-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 disabled:bg-gray-400"
+                  onClick={() => sendReply(message.id)}
+                  disabled={sendingReply[message.id]}
+                >
+                  {sendingReply[message.id] ? 'Envoi...' : 'Envoyer'}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-gray-500 mb-6">Aucun message des parents.</p>
+      )}
+
       {/* Section des visualisations */}
-      <h3 className="text-lg font-semibold mb-4 text-gray-800">Données du capteur (Statique)</h3>
+      <h3 className="text-lg font-semibold mb-4 text-gray-800">Données du capteur</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Jauge de température (Aiguille) */}
         <div className="flex flex-col items-center">
