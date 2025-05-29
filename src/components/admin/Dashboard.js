@@ -22,8 +22,8 @@ export default function AdminDashboard({ _userId }) {
   const [drivers, setDrivers] = useState([]);
   const [students, setStudents] = useState([]);
   const [showForm, setShowForm] = useState({ users: false, buses: false, drivers: false, students: false });
-  const [newUser, setNewUser] = useState({ id: null, username: '', email: '', role: 'parent', cinNumber: '', phoneNumber: '', password: '' });
-  const [newBus, setNewBus] = useState({ id: null, busNumber: '', route: '', drivers: [], latitude: '', longitude: '' });
+  const [newUser, setNewUser] = useState({ id: null, username: '', email: '', role: 'parent', cinNumber: '', capacity: '' });
+  const [newBus, setNewBus] = useState({ id: null, busNumber: '', route: '', drivers: [], capacity: '' });
   const [newDriver, setNewDriver] = useState({ id: null, username: '', email: '', cinNumber: '', phoneNumber: '' });
   const [options, setOptions] = useState([]);
   const [items, setItems] = useState([]);
@@ -101,8 +101,7 @@ export default function AdminDashboard({ _userId }) {
             busNumber: bus.uniqueId,
             route: bus.name,
             drivers: bus.drivers || [],
-            latitude: bus.latitude || '',
-            longitude: bus.longitude || ''
+            capacity: bus.capacity || ''
           })));
         } else {
           console.error('Failed to fetch buses:', data.message);
@@ -299,8 +298,7 @@ export default function AdminDashboard({ _userId }) {
       uniqueId: newBus.busNumber,
       name: newBus.route,
       drivers: newBus.drivers,
-      latitude: newBus.latitude,
-      longitude: newBus.longitude
+      capacity: newBus.capacity
     };
 
     console.log('Sending bus data:', busToAdd);
@@ -330,8 +328,7 @@ export default function AdminDashboard({ _userId }) {
             busNumber: data.uniqueId,
             route: data.name,
             drivers: data.drivers || [],
-            latitude: data.latitude,
-            longitude: data.longitude
+            capacity: data.capacity
           } : bus));
         } else {
           setBuses([...buses, {
@@ -339,11 +336,10 @@ export default function AdminDashboard({ _userId }) {
             busNumber: data.uniqueId,
             route: data.name,
             drivers: data.drivers || [],
-            latitude: data.latitude,
-            longitude: data.longitude
+            capacity: data.capacity
           }]);
         }
-        setNewBus({ id: null, busNumber: '', route: '', drivers: [], latitude: '', longitude: '' });
+        setNewBus({ id: null, busNumber: '', route: '', drivers: [], capacity: '' });
         setShowForm({ ...showForm, buses: false });
         setErrorMsg('');
       } else {
@@ -447,8 +443,7 @@ export default function AdminDashboard({ _userId }) {
       busNumber: bus.busNumber,
       route: bus.route,
       drivers: bus.drivers.map(driver => driver.cinNumber),
-      latitude: bus.latitude,
-      longitude: bus.longitude
+      capacity: bus.capacity
     });
     setShowForm({ ...showForm, buses: true });
   };
@@ -579,8 +574,7 @@ export default function AdminDashboard({ _userId }) {
               bus={buses.map(bus => ({
                 id: bus.id,
                 uniqueId: bus.busNumber,
-                latitude: bus.latitude,
-                longitude: bus.longitude,
+                capacity: bus.capacity,
               }))}
             />
           )}
@@ -788,7 +782,7 @@ export default function AdminDashboard({ _userId }) {
                 <h1 className="text-lg font-semibold text-gray-800">Liste des bus</h1>
                 <button
                   onClick={() => {
-                    setNewBus({ id: null, busNumber: '', route: '', drivers: [], latitude: '', longitude: '' });
+                    setNewBus({ id: null, busNumber: '', route: '', drivers: [], capacity: '' });
                     setShowForm({ ...showForm, buses: true });
                   }}
                   className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
@@ -861,33 +855,20 @@ export default function AdminDashboard({ _userId }) {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="latitude">
-                        Latitude
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="capacity">
+                        Capacity
                       </label>
                       <input
-                        id="latitude"
-                        name="latitude"
+                        id="capacity"
+                        name="capacity"
                         type="text"
-                        placeholder="Latitude"
-                        value={newBus.latitude}
+                        placeholder="capacité"
+                        value={newBus.capacity}
                         onChange={(e) => handleInputChange(e, 'bus')}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
-                    <div>
-                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="longitude">
-                        Longitude
-                      </label>
-                      <input
-                        id="longitude"
-                        name="longitude"
-                        type="text"
-                        placeholder="Longitude"
-                        value={newBus.longitude}
-                        onChange={(e) => handleInputChange(e, 'bus')}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
+                    
                     <div className="flex space-x-2">
                       <button
                         type="submit"
@@ -921,10 +902,7 @@ export default function AdminDashboard({ _userId }) {
                         Conducteurs
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Lat
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Long
+                        Capacité
                       </th>
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
@@ -941,8 +919,7 @@ export default function AdminDashboard({ _userId }) {
                             ? bus.drivers.map(driver => `${driver.username} (CIN: ${driver.cinNumber})`).join(', ')
                             : 'Aucun conducteur'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.latitude}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.longitude}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{bus.capacity}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
                           <div className="flex justify-center space-x-2">
                             <button

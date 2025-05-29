@@ -78,13 +78,13 @@ export default function AlertsSection() {
 
     setSendingReply((prev) => ({ ...prev, [messageId]: true }));
     try {
-      await axios.post(`http://localhost:80/api/messages/${messageId}/reply`, {
+      await axios.post(`http://localhost:3001/api/messages/${messageId}/reply`, {
         content: replyContent[messageId],
         sender: 'Admin',
       });
       toast.success('Réponse envoyée avec succès.', { position: 'top-right' });
       // Actualiser les messages
-      const response = await axios.get('http://localhost:80/api/messages');
+      const response = await axios.get('http://localhost:3001/api/messages');
       const parentMessages = response.data.filter(msg => msg.sender.startsWith('Parent:') && !msg.parentMessageId);
       setMessages(parentMessages);
       setReplyContent((prev) => ({ ...prev, [messageId]: '' }));
