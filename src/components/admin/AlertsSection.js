@@ -6,9 +6,7 @@ import axios from 'axios';
 
 export default function AlertsSection() {
   // État pour les alertes
-  const [alerts, setAlerts] = useState([
-    { id: 1, message: 'Bus 1 en retard (15 min)', timestamp: '2025-05-15 09:30:00', read: false },
-  ]);
+  const [alerts, setAlerts] = useState([]);
 
   // État pour les messages des parents
   const [messages, setMessages] = useState([]);
@@ -17,19 +15,23 @@ export default function AlertsSection() {
 
   // Données statiques pour les visualisations
   const staticData = {
-    temperature: 25, // °C (valeur statique entre -10 et 50°C)
-    humidity: 60, // % (valeur statique entre 0 et 100%)
-    pressure: 1013, // hPa (valeur statique entre 900 et 1100 hPa)
+    temperature: 25, // °C
+    humidity: 60, // %
+    pressure: 1013, // hPa
   };
 
-  // Simuler une récupération de données via API pour les alertes
+  // Récupérer les alertes de fatigue du conducteur via API
   useEffect(() => {
     const fetchAlerts = async () => {
       try {
-        const response = [
-          { id: 1, message: 'Bus 1 en retard (15 min)', timestamp: '2025-05-15 09:30:00', read: false },
-        ];
-        setAlerts(response);
+        const response = await axios.get('http://localhost:80/api/driver-alerts');
+        // Supposons que response.data est un tableau d'alertes
+        setAlerts(response.data.map(alert => ({
+          id: alert._id, // MongoDB utilise _id
+          message: alert.message,
+          timestamp: new Date(alert.timestamp).toLocaleString(),
+          read: alert.read || false,
+        })));
       } catch (error) {
         console.error('Erreur lors de la récupération des alertes:', error);
         toast.error('Erreur lors de la récupération des alertes.', { position: 'top-right' });
@@ -37,6 +39,9 @@ export default function AlertsSection() {
     };
 
     fetchAlerts();
+    // Actualiser toutes les 30 secondes
+    const interval = setInterval(fetchAlerts, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   // Récupérer les messages des parents via API
@@ -46,7 +51,13 @@ export default function AlertsSection() {
         const response = await axios.get('http://localhost:80/api/messages');
         // Filtrer les messages des parents (exclure les réponses de l'admin)
         const parentMessages = response.data.filter(msg => msg.sender.startsWith('Parent:') && !msg.parentMessageId);
-        setMessages(parentMessages);
+        setMessages(parentMessages.map(msg => ({
+          id: msg._id,
+          sender: msg.sender,
+          content: msg.content,
+          timestamp: new Date(msg.timestamp).toLocaleString(),
+          isRead: msg.isRead || false,
+        })));
       } catch (error) {
         console.error('Erreur lors de la récupération des messages:', error);
         toast.error('Erreur lors de la récupération des messages.', { position: 'top-right' });
@@ -60,13 +71,35 @@ export default function AlertsSection() {
   }, []);
 
   // Fonction pour marquer une alerte comme lue
-  const markAlertAsRead = (alertId) => {
-    setAlerts((prevAlerts) =>
-      prevAlerts.map((alert) =>
-        alert.id === alertId ? { ...alert, read: true } : alert
-      )
-    );
-    toast.success('Alerte marquée comme lue.', { position: 'top-right' });
+  const markAlertAsRead = async (alertId) => {
+    try {
+      await axios.patch(`http://localhost:80/api/driver-alerts/${alertId}/read`);
+      setAlerts((prevAlerts) =>
+        prevAlerts.map((alert) =>
+          alert.id === alertId ? { ...alert, read: true } : alert
+        )
+      );
+      toast.success('Alerte marquée comme lue.', { position: 'top-right' });
+    } catch (error) {
+      console.error('Erreur lors du marquage de l\'alerte:', error);
+      toast.error('Erreur lors du marquage de l\'alerte.', { position: 'top-right' });
+    }
+  };
+
+  // Fonction pour marquer un message comme lu
+  const markMessageAsRead = async (messageId) => {
+    try {
+      await axios.patch(`http://localhost:80/api/messages/${messageId}/read`);
+      setMessages((prevMessages) =>
+        prevMessages.map((msg) =>
+          msg.id === messageId ? { ...msg, isRead: true } : msg
+        )
+      );
+      toast.success('Message marqué comme lu.', { position: 'top-right' });
+    } catch (error) {
+      console.error('Erreur lors du marquage du message:', error);
+      toast.error('Erreur lors du marquage du message.', { position: 'top-right' });
+    }
   };
 
   // Fonction pour envoyer une réponse de l'admin
@@ -78,15 +111,21 @@ export default function AlertsSection() {
 
     setSendingReply((prev) => ({ ...prev, [messageId]: true }));
     try {
-      await axios.post(`http://localhost:3001/api/messages/${messageId}/reply`, {
+      await axios.post(`http://localhost:80/api/messages/${messageId}/reply`, {
         content: replyContent[messageId],
         sender: 'Admin',
       });
       toast.success('Réponse envoyée avec succès.', { position: 'top-right' });
       // Actualiser les messages
-      const response = await axios.get('http://localhost:3001/api/messages');
+      const response = await axios.get('http://localhost:80/api/messages');
       const parentMessages = response.data.filter(msg => msg.sender.startsWith('Parent:') && !msg.parentMessageId);
-      setMessages(parentMessages);
+      setMessages(parentMessages.map(msg => ({
+        id: msg._id,
+        sender: msg.sender,
+        content: msg.content,
+        timestamp: new Date(msg.timestamp).toLocaleString(),
+        isRead: msg.isRead || false,
+      })));
       setReplyContent((prev) => ({ ...prev, [messageId]: '' }));
     } catch (error) {
       console.error('Erreur lors de l\'envoi de la réponse:', error);
@@ -97,17 +136,17 @@ export default function AlertsSection() {
   };
 
   // Calcul de l'angle de l'aiguille pour la température (plage: -10°C à 50°C)
-  const tempAngle = ((staticData.temperature - (-10)) / (50 - (-10))) * 180 - 90; // Convertir en angle (-90° à 90°)
+  const tempAngle = ((staticData.temperature - (-10)) / (50 - (-10))) * 180 - 90;
 
   // Calcul du pourcentage pour la barre circulaire d'humidité
-  const humidityPercentage = staticData.humidity; // Déjà en %
+  const humidityPercentage = staticData.humidity;
 
   // Calcul de la hauteur de la barre de pression (plage: 900 à 1100 hPa)
-  const pressureHeight = ((staticData.pressure - 900) / (1100 - 900)) * 100; // Convertir en %
+  const pressureHeight = ((staticData.pressure - 900) / (1100 - 900)) * 100;
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6 transition-transform transform hover:scale-105">
-      {/* Section des alertes existantes */}
+      {/* Section des alertes */}
       <h3 className="text-lg font-semibold mb-4 flex items-center text-red-600">
         <FaExclamationCircle className="mr-2" /> Alertes récentes
       </h3>
@@ -157,11 +196,11 @@ export default function AlertsSection() {
                 <div>
                   <span className="font-medium">{message.sender.replace('Parent:', '')}</span>
                   <p className="text-sm">{message.content}</p>
-                  <p className="text-xs text-gray-500">{new Date(message.timestamp).toLocaleString()}</p>
+                  <p className="text-xs text-gray-500">{message.timestamp}</p>
                 </div>
                 {!message.isRead && (
                   <button
-                    onClick={() => markAlertAsRead(message.id)}
+                    onClick={() => markMessageAsRead(message.id)}
                     className="text-blue-500 hover:text-blue-700 text-sm"
                     aria-label="Marquer le message comme lu"
                   >
@@ -199,7 +238,6 @@ export default function AlertsSection() {
         {/* Jauge de température (Aiguille) */}
         <div className="flex flex-col items-center">
           <div className="relative w-40 h-20">
-            {/* Fond de la jauge */}
             <div className="absolute w-40 h-20 bg-gray-200 rounded-t-full overflow-hidden">
               <div
                 className="absolute w-full h-full"
@@ -209,7 +247,6 @@ export default function AlertsSection() {
                 }}
               />
             </div>
-            {/* Aiguille */}
             <div
               className="absolute w-1 h-16 bg-black origin-bottom"
               style={{
@@ -219,7 +256,6 @@ export default function AlertsSection() {
                 transformOrigin: 'bottom',
               }}
             />
-            {/* Centre de l'aiguille */}
             <div className="absolute w-4 h-4 bg-black rounded-full bottom-0 left-1/2 transform -translate-x-1/2" />
           </div>
           <p className="mt-2 text-gray-700 font-medium">Température: {staticData.temperature}°C</p>
@@ -230,9 +266,7 @@ export default function AlertsSection() {
         <div className="flex flex-col items-center">
           <div className="relative w-32 h-32">
             <svg className="w-full h-full" viewBox="0 0 100 100">
-              {/* Cercle de fond */}
               <circle cx="50" cy="50" r="45" fill="none" stroke="#e6e6e6" strokeWidth="10" />
-              {/* Cercle de progression */}
               <circle
                 cx="50"
                 cy="50"
@@ -240,7 +274,7 @@ export default function AlertsSection() {
                 fill="none"
                 stroke="#4CAF50"
                 strokeWidth="10"
-                strokeDasharray={`${(humidityPercentage * 2.83)} 283`} // 2.83 = (2 * π * 45) / 100
+                strokeDasharray={`${(humidityPercentage * 2.83)} 283`}
                 transform="rotate(-90 50 50)"
               />
             </svg>
@@ -255,12 +289,10 @@ export default function AlertsSection() {
         {/* Jauge linéaire pour la pression */}
         <div className="flex flex-col items-center">
           <div className="relative w-16 h-40 bg-gray-200 rounded-lg overflow-hidden">
-            {/* Barre de progression */}
             <div
               className="absolute bottom-0 w-full bg-gradient-to-t from-blue-500 to-blue-700"
               style={{ height: `${pressureHeight}%` }}
             />
-            {/* Marques de graduation */}
             <div className="absolute left-0 top-0 h-full w-full">
               {[900, 950, 1000, 1050, 1100].map((value) => {
                 const position = ((value - 900) / (1100 - 900)) * 100;
