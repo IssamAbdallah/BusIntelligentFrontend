@@ -22,7 +22,7 @@ export default function AdminDashboard({ _userId }) {
   const [drivers, setDrivers] = useState([]);
   const [students, setStudents] = useState([]);
   const [showForm, setShowForm] = useState({ users: false, buses: false, drivers: false, students: false });
-  const [newUser, setNewUser] = useState({ id: null, username: '', email: '', role: 'parent', cinNumber: '', capacity: '' });
+  const [newUser, setNewUser] = useState({ id: null, username: '', email: '', role: 'parent', cinNumber: '', phoneNumber: '', password: '' });
   const [newBus, setNewBus] = useState({ id: null, busNumber: '', route: '', drivers: [], capacity: '' });
   const [newDriver, setNewDriver] = useState({ id: null, username: '', email: '', cinNumber: '', phoneNumber: '' });
   const [options, setOptions] = useState([]);
@@ -211,6 +211,7 @@ export default function AdminDashboard({ _userId }) {
       return;
     }
 
+    // Restrict regular admins to only creating "parent" roles
     if (user?.role === 'admin' && newUser.role !== 'parent') {
       setErrorMsg('Seuls les utilisateurs de type "parent" peuvent être créés par un admin');
       return;
@@ -223,6 +224,8 @@ export default function AdminDashboard({ _userId }) {
       cinNumber: newUser.cinNumber,
       phoneNumber: newUser.phoneNumber,
       password: newUser.password,
+      // Set myadmin to the current user's email
+      myadmin: user?.email,
     };
 
     console.log('Sending user data:', userToAdd);
@@ -558,12 +561,12 @@ export default function AdminDashboard({ _userId }) {
           <div className="w-full mx-auto py-4 px-4 sm:px-6 lg:px-8">
             <h1 className="text-2xl font-bold text-gray-900">
               {activeSection === 'dashboard' ? 'Tableau de bord' : 
-              activeSection === 'users' ? 'Parents' : 
-              activeSection === 'buses' ? 'Bus' : 
-              activeSection === 'drivers' ? 'Conducteurs' : 
-              activeSection === 'students' ? 'Élèves' : 
-              activeSection === 'stats' ? 'Statistiques' : 
-              activeSection === 'alerts' ? 'Alertes' : 'Alertes'}
+               activeSection === 'users' ? 'Utilisateurs' : 
+               activeSection === 'buses' ? 'Bus' : 
+               activeSection === 'drivers' ? 'Conducteurs' : 
+               activeSection === 'students' ? 'Élèves' : 
+               activeSection === 'stats' ? 'Statistiques' : 
+               activeSection === 'alerts' ? 'Alertes' : 'Alertes'}
             </h1>
           </div>
         </header>
@@ -582,7 +585,7 @@ export default function AdminDashboard({ _userId }) {
           {activeSection === 'users' && (
             <div className="bg-white rounded-xl shadow-card overflow-hidden">
               <div className="p-4 border-b border-gray-100 flex justify-between items-center">
-                <h2 className="text-lg font-semibold text-gray-800">Liste des parents</h2>
+                <h2 className="text-lg font-semibold text-gray-800">Liste des utilisateurs</h2>
                 <button
                   onClick={() => {
                     setNewUser({ id: null, username: '', email: '', role: 'parent', cinNumber: '', phoneNumber: '', password: '' });
@@ -613,10 +616,13 @@ export default function AdminDashboard({ _userId }) {
                         value={newUser.role}
                         onChange={(e) => handleInputChange(e, 'user')}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        disabled={user?.role === 'admin'}
+                        disabled={user?.role === 'admin'} // Disable for regular admins, enable for superadmins
                         required
                       >
                         <option value="parent">Parent</option>
+                        {user?.role === 'superadmin' && ( // Only show admin option for superadmins
+                          <option value="admin">Admin</option>
+                        )}
                       </select>
                     </div>
                     <div>
@@ -856,13 +862,13 @@ export default function AdminDashboard({ _userId }) {
                     </div>
                     <div>
                       <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="capacity">
-                        Capacity
+                        Capacité
                       </label>
                       <input
                         id="capacity"
                         name="capacity"
                         type="text"
-                        placeholder="capacité"
+                        placeholder="Capacité"
                         value={newBus.capacity}
                         onChange={(e) => handleInputChange(e, 'bus')}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1103,7 +1109,7 @@ export default function AdminDashboard({ _userId }) {
             <StudentSection
               token={token}
               navigate={navigate}
-              users={users} // Ajout de la prop users
+              users={users}
               setErrorMsg={setErrorMsg}
               students={students}
               setStudents={setStudents}

@@ -30,7 +30,7 @@ export default function Sidebar({ onSectionChange }) {
     { 
       id: 'users', 
       icon: FaUser, 
-      label: 'Parents', 
+      label: 'Utilisateurs', 
     },
     { 
       id: 'students', 

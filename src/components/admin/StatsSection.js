@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaBus, FaClock, FaMapMarkerAlt, FaUserGraduate, FaSearch, FaCheckCircle, FaTimesCircle, FaBell, FaFileAlt } from 'react-icons/fa';
+import { FaBus, FaClock, FaMapMarkerAlt, FaUserGraduate, FaSearch, FaCheckCircle, FaTimesCircle, FaBell, FaFileAlt, FaCalculator } from 'react-icons/fa';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -36,6 +36,7 @@ const formatDate = (isoDate) => {
 export default function StatsSection() {
   const { token } = useAuth();
   const [stopsData, setStopsData] = useState([]);
+  const [comptageCount, setComptageCount] = useState(0); // New state for comptage count
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
@@ -50,7 +51,7 @@ export default function StatsSection() {
   // États pour les notifications
   const [notifications, setNotifications] = useState([]);
 
-  // Récupérer les données des stops et stoptimes depuis MongoDB
+  // Récupérer les données des stops, stoptimes, et comptages depuis MongoDB
   useEffect(() => {
     const fetchStopsData = async () => {
       try {
@@ -110,6 +111,29 @@ export default function StatsSection() {
       }
     };
 
+    const fetchComptages = async () => {
+      try {
+        console.log('Récupération des comptages...');
+        const response = await fetch('http://localhost:80/api/comptages', {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`Échec de la récupération des comptages : ${errorData.error || response.statusText}`);
+        }
+        const comptages = await response.json();
+        console.log('Comptages récupérés :', comptages);
+        setComptageCount(comptages.length);
+      } catch (err) {
+        console.error('Erreur dans fetchComptages :', err);
+        setError(err.message);
+        toast.error('Erreur lors de la récupération des comptages.', { position: 'top-right' });
+      }
+    };
+
     const fetchStudentsData = async () => {
       try {
         setStudentsLoading(true);
@@ -153,6 +177,7 @@ export default function StatsSection() {
 
     if (token) {
       fetchStopsData();
+      fetchComptages(); // Call the new fetch function
       fetchStudentsData();
     } else {
       setError('Utilisateur non authentifié');
@@ -168,6 +193,7 @@ export default function StatsSection() {
       ========================================================
       
       STATISTIQUES GÉNÉRALES:
+      - Nombre de comptages: ${comptageCount}
       - Nombre d'arrêts enregistrés: ${stopsData.length}
       - Élèves présents: ${studentsData.present.length}
       - Élèves absents: ${studentsData.absent.length}
@@ -216,13 +242,23 @@ export default function StatsSection() {
     <div className="p-4 lg:p-6 bg-gray-50 min-h-screen space-y-6">
       
       {/* Section Statistiques rapides */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl p-6 shadow-lg">
           <div className="flex items-center justify-between">
             <div>
               <FaBus className="text-3xl mb-2" />
               <h3 className="text-lg font-semibold">Arrêts Enregistrés</h3>
               <p className="text-2xl font-bold">{stopsData.length}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl p-6 shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <FaCalculator className="text-3xl mb-2" />
+              <h3 className="text-lg font-semibold">Comptages Enregistrés</h3>
+              <p className="text-2xl font-bold">{comptageCount}</p>
             </div>
           </div>
         </div>
@@ -632,4 +668,4 @@ export default function StatsSection() {
       `}</style>
     </div>
   );
-} 
+}

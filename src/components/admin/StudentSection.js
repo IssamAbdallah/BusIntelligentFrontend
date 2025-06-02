@@ -208,13 +208,13 @@ export default function StudentSection({ token, navigate, users = [], setErrorMs
             </p>
             <div>
               <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="username">
-                Nom d'utilisateur
+                Nom et Prénom
               </label>
               <input
                 id="username"
                 name="username"
                 type="text"
-                placeholder="Nom d'utilisateur"
+                placeholder="Nom et Prénom"
                 value={newStudent.username}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"

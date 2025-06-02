@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { FaExclamationCircle, FaThermometerHalf, FaTint, FaCompress, FaEye, FaPaperPlane, FaBell, FaEnvelope, FaUser } from 'react-icons/fa';
+import { useAuth } from '../../contexts/AuthContext';
 
 // Configuration des constantes
 const CONFIG = {
@@ -96,7 +97,7 @@ const PressureGauge = ({ pressure }) => {
       <div className="flex items-center space-x-3">
         <div className="relative w-4 h-16 bg-slate-200 rounded-full overflow-hidden">
           <div
-            className="absolute bottom-0 w-full bg-gradient-to-t from-indigo-600 to-indigo-400 rounded-full transition-all duration-1000"
+            className="absolute bottom-2 h-full bg-gradient-to-t from-indigo-600 to-indigo-400 rounded-full transition-all duration-1000"
             style={{ height: `${height}%` }}
           />
         </div>
@@ -109,25 +110,55 @@ const PressureGauge = ({ pressure }) => {
   );
 };
 
-// Composant principal compact
+// Composant principal
 export default function CompactDashboard() {
+  const { token } = useAuth();
   const [alerts, setAlerts] = useState([]);
   const [messages, setMessages] = useState([]);
   const [replyContent, setReplyContent] = useState({});
   const [sendingReply, setSendingReply] = useState({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('alerts');
+  const [sensorData, setSensorData] = useState({
+    temperature: 0,
+    humidity: 30,
+    pressure: 1000
+  });
 
-  const staticData = {
-    temperature: 25,
-    humidity: 60,
-    pressure: 1013,
-  };
+  // Fetch BME280 sensor data
+  const fetchBMEData = useCallback(async () => {
+    try {
+      const response = await fetch(`${CONFIG.API_BASE_URL}/bmes`, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Échec de la récupération des données BME280 : ${errorData.error || response.statusText}`);
+      }
+      const data = await response.json();
+      setSensorData({
+        temperature: parseFloat(data.temperature) || 0,
+        humidity: parseFloat(data.humidity) || 0,
+        pressure: parseFloat(data.pression) || 0,
+      });
+    } catch (error) {
+      console.error('Erreur lors de la récupération des données BME280:', error);
+      toast.error('Impossible de charger les données BME280', { position: CONFIG.TOAST_POSITION });
+    }
+  }, [token]);
 
   // Fetch alerts with error handling
   const fetchAlerts = useCallback(async () => {
     try {
-      const response = await fetch(`${CONFIG.API_BASE_URL}/driveralerts`);
+      const response = await fetch(`${CONFIG.API_BASE_URL}/driveralerts`, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
       if (!response.ok) throw new Error('Failed to fetch alerts');
       const data = await response.json();
       
@@ -142,12 +173,17 @@ export default function CompactDashboard() {
       console.error('Erreur lors de la récupération des alertes:', error);
       toast.error('Impossible de charger les alertes', { position: CONFIG.TOAST_POSITION });
     }
-  }, []);
+  }, [token]);
 
   // Fetch messages with error handling
   const fetchMessages = useCallback(async () => {
     try {
-      const response = await fetch(`${CONFIG.API_BASE_URL}/messages`);
+      const response = await fetch(`${CONFIG.API_BASE_URL}/messages`, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
       if (!response.ok) throw new Error('Failed to fetch messages');
       const data = await response.json();
       
@@ -163,30 +199,40 @@ export default function CompactDashboard() {
       console.error('Erreur lors de la récupération des messages:', error);
       toast.error('Impossible de charger les messages', { position: CONFIG.TOAST_POSITION });
     }
-  }, []);
+  }, [token]);
 
   // Initialize data
   useEffect(() => {
     const initializeData = async () => {
       setLoading(true);
-      await Promise.all([fetchAlerts(), fetchMessages()]);
+      await Promise.all([fetchBMEData(), fetchAlerts(), fetchMessages()]);
       setLoading(false);
     };
 
-    initializeData();
-    const interval = setInterval(() => {
-      fetchAlerts();
-      fetchMessages();
-    }, CONFIG.REFRESH_INTERVAL);
+    if (token) {
+      initializeData();
+      const interval = setInterval(() => {
+        fetchBMEData();
+        fetchAlerts();
+        fetchMessages();
+      }, CONFIG.REFRESH_INTERVAL);
 
-    return () => clearInterval(interval);
-  }, [fetchAlerts, fetchMessages]);
+      return () => clearInterval(interval);
+    } else {
+      setLoading(false);
+      toast.error('Utilisateur non authentifié', { position: CONFIG.TOAST_POSITION });
+    }
+  }, [fetchBMEData, fetchAlerts, fetchMessages, token]);
 
   // Mark alert as read
   const markAlertAsRead = async (alertId) => {
     try {
       const response = await fetch(`${CONFIG.API_BASE_URL}/driveralerts/${alertId}/read`, {
         method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
       });
       if (!response.ok) throw new Error('Failed to mark alert as read');
       
@@ -205,6 +251,10 @@ export default function CompactDashboard() {
     try {
       const response = await fetch(`${CONFIG.API_BASE_URL}/messages/${messageId}/read`, {
         method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
       });
       if (!response.ok) throw new Error('Failed to mark message as read');
       
@@ -230,7 +280,10 @@ export default function CompactDashboard() {
     try {
       const response = await fetch(`${CONFIG.API_BASE_URL}/messages/${messageId}/reply`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ content, sender: 'Admin' }),
       });
       
@@ -284,9 +337,9 @@ export default function CompactDashboard() {
 
         {/* Sensor Data Section - Compact Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <TemperatureGauge temperature={staticData.temperature} />
-          <HumidityGauge humidity={staticData.humidity} />
-          <PressureGauge pressure={staticData.pressure} />
+          <TemperatureGauge temperature={sensorData.temperature} />
+          <HumidityGauge humidity={sensorData.humidity} />
+          <PressureGauge pressure={sensorData.pressure} />
         </div>
 
         {/* Tabs Navigation */}
