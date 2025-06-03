@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { FaBus, FaClock, FaMapMarkerAlt, FaUserGraduate, FaSearch, FaCheckCircle, FaTimesCircle, FaBell, FaFileAlt, FaCalculator } from 'react-icons/fa';
+import { FaBus, FaClock, FaMapMarkerAlt, FaUserGraduate, FaSearch, FaCheckCircle, FaTimesCircle, FaBell, FaFileAlt } from 'react-icons/fa';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-// Fonction pour calculer la durée en secondes entre arrival_time et departure_time
+// Calculer la durée en secondes entre arrival_time et departure_time
 const calculateDuration = (arrival, departure) => {
   if (!arrival || !departure) return 0;
   const [arrH, arrM, arrS] = arrival.split(':').map(Number);
@@ -14,19 +14,67 @@ const calculateDuration = (arrival, departure) => {
   return departureSeconds - arrivalSeconds;
 };
 
-// Fonction pour formater la durée en minutes et secondes
+// Formater la durée en minutes et secondes
 const formatDuration = (seconds) => {
-  if (seconds < 60) {
-    return `${seconds}s`;
-  }
+  if (seconds < 60) return `${seconds}s`;
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
   return remainingSeconds > 0 ? `${minutes}min ${remainingSeconds}s` : `${minutes}min`;
 };
 
-// Fonction pour formater la date ISO en DD-MM-YYYY
+// Formater une date ISO en DD-MM-YYYY
 const formatDate = (isoDate) => {
   const date = new Date(isoDate);
+  if (isNaN(date)) return 'Date invalide';
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+};
+
+// Normaliser les chaînes (supprimer espaces, ignorer casse)
+const normalizeString = (str) => {
+  return str ? String(str).trim().toLowerCase() : '';
+};
+
+// Normaliser la date en DD-MM-YYYY
+const normalizeDate = (dateStr) => {
+  if (!dateStr) {
+    console.warn('Date reçue est vide ou nulle');
+    return '';
+  }
+  console.log('Date brute reçue :', dateStr);
+  const formats = [
+    { regex: /^(\d{2})-(\d{2})-(\d{4})$/, parse: (d, m, y) => `${d}-${m}-${y}` }, // DD-MM-YYYY
+    { regex: /^(\d{4})-(\d{2})-(\d{2})$/, parse: (y, m, d) => `${d}-${m}-${y}` }, // YYYY-MM-DD
+    { regex: /^(\d{2})\/(\d{2})\/(\d{4})$/, parse: (d, m, y) => `${d}-${m}-${y}` }, // DD/MM/YYYY
+    { regex: /^(\d{2})\.(\d{2})\.(\d{4})$/, parse: (d, m, y) => `${d}-${m}-${y}` }, // DD.MM.YYYY
+  ];
+  for (const { regex, parse } of formats) {
+    const match = String(dateStr).match(regex);
+    if (match) {
+      const [, a, b, c] = match;
+      const normalized = parse(a, b, c);
+      console.log(`Date normalisée de ${dateStr} à ${normalized}`);
+      return normalized;
+    }
+  }
+  const date = new Date(dateStr);
+  if (!isNaN(date)) {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    const normalized = `${day}-${month}-${year}`;
+    console.log(`Date normalisée via Date de ${dateStr} à ${normalized}`);
+    return normalized;
+  }
+  console.warn(`Impossible de normaliser la date : ${dateStr}`);
+  return dateStr;
+};
+
+// Obtenir la date actuelle en DD-MM-YYYY
+const getCurrentDate = () => {
+  const date = new Date();
   const day = String(date.getDate()).padStart(2, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const year = date.getFullYear();
@@ -36,57 +84,47 @@ const formatDate = (isoDate) => {
 export default function StatsSection() {
   const { token } = useAuth();
   const [stopsData, setStopsData] = useState([]);
-  const [comptageCount, setComptageCount] = useState(0); // New state for comptage count
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
-  // États pour les données des élèves
   const [studentsData, setStudentsData] = useState({
     present: [],
-    absent: []
+    absent: [],
+    allStudents: []
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [studentsLoading, setStudentsLoading] = useState(true);
-  
-  // États pour les notifications
   const [notifications, setNotifications] = useState([]);
 
-  // Récupérer les données des stops, stoptimes, et comptages depuis MongoDB
   useEffect(() => {
+    const currentDate = getCurrentDate();
+    console.log('Date actuelle utilisée :', currentDate);
+
     const fetchStopsData = async () => {
       try {
         setLoading(true);
         setError(null);
-
         console.log('Récupération des stops...');
         const stopsResponse = await fetch('http://localhost:80/api/stops', {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         });
         if (!stopsResponse.ok) {
           const errorData = await stopsResponse.json();
-          throw new Error(`Échec de la récupération des stations : ${errorData.message || stopsResponse.statusText}`);
+          throw new Error(`Échec récupération stops : ${errorData.message || stopsResponse.statusText}`);
         }
         const stops = await stopsResponse.json();
         console.log('Stops récupérés :', stops);
 
         console.log('Récupération des stoptimes...');
         const stopTimesResponse = await fetch('http://localhost:80/api/stoptimes', {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         });
         if (!stopTimesResponse.ok) {
           const errorData = await stopTimesResponse.json();
-          throw new Error(`Échec de la récupération des durées d'arrêt : ${errorData.message || stopTimesResponse.statusText}`);
+          throw new Error(`Échec récupération stoptimes : ${errorData.message || stopTimesResponse.statusText}`);
         }
         const stopTimes = await stopTimesResponse.json();
         console.log('Stoptimes récupérés :', stopTimes);
 
-        // Joindre les données
         const combinedData = stopTimes.map((stopTime) => {
           const stop = stops.find((s) => s._id === stopTime.stop);
           return {
@@ -99,118 +137,191 @@ export default function StatsSection() {
           };
         });
 
-        // Trier par timestamp décroissant (plus récent en premier)
         combinedData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
         setStopsData(combinedData);
       } catch (err) {
-        console.error('Erreur dans fetchStopsData :', err);
+        console.error('Erreur fetchStopsData :', err);
         setError(err.message);
       } finally {
         setLoading(false);
       }
     };
 
-    const fetchComptages = async () => {
+    const fetchStudents = async () => {
       try {
-        console.log('Récupération des comptages...');
-        const response = await fetch('http://localhost:80/api/comptages', {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
+        console.log('Récupération des élèves...');
+        const studentsResponse = await fetch('http://localhost:80/api/students', {
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         });
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(`Échec de la récupération des comptages : ${errorData.error || response.statusText}`);
+        if (!studentsResponse.ok) {
+          const errorData = await studentsResponse.json();
+          throw new Error(`Échec récupération élèves : ${errorData.message || studentsResponse.statusText}`);
         }
-        const comptages = await response.json();
-        console.log('Comptages récupérés :', comptages);
-        setComptageCount(comptages.length);
+        const students = await studentsResponse.json();
+        console.log('Élèves récupérés :', JSON.stringify(students, null, 2));
+        return students;
       } catch (err) {
-        console.error('Erreur dans fetchComptages :', err);
-        setError(err.message);
-        toast.error('Erreur lors de la récupération des comptages.', { position: 'top-right' });
+        console.error('Erreur fetchStudents :', err);
+        throw err;
       }
     };
 
-    const fetchStudentsData = async () => {
+    const fetchEvents = async () => {
+      try {
+        console.log('Récupération des événements...');
+        const eventsResponse = await fetch('http://localhost:80/api/datas', {
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        });
+        if (!eventsResponse.ok) {
+          const errorData = await eventsResponse.json();
+          throw new Error(`Échec récupération événements : ${errorData.error || eventsResponse.statusText}`);
+        }
+        const events = await eventsResponse.json();
+        console.log('Réponse brute événements :', JSON.stringify(events, null, 2));
+        const eventData = Array.isArray(events.data) ? events.data : Array.isArray(events) ? events : [];
+        console.log('Événements extraits :', JSON.stringify(eventData, null, 2));
+        return eventData;
+      } catch (err) {
+        console.error('Erreur fetchEvents :', err);
+        throw err;
+      }
+    };
+
+    const fetchStudentsAndEvents = async () => {
       try {
         setStudentsLoading(true);
-        // Simuler des données d'élèves - remplacez par votre API réelle
-        const studentsResponse = {
-          present: [
-            { id: 1, name: 'Issam Abdallah', busNumber: 'Bus 001' },
-            { id: 2, name: 'Abir Brahem', busNumber: 'Bus 001' },
-            { id: 3, name: 'Zeineb Issaoui', busNumber: 'Bus 001' },
-            { id: 4, name: 'Nour El Imen', busNumber: 'Bus 001' },
-            { id: 9, name: 'Fatma Ben Ali', busNumber: 'Bus 001' },
-            { id: 10, name: 'Ahmed Trabelsi', busNumber: 'Bus 001' },
-          ],
-          absent: [
-            { id: 5, name: 'Sara Haddad', busNumber: 'Bus 001' },
-            { id: 6, name: 'Mohamed Kamel', busNumber: 'Bus 001' },
-            { id: 7, name: 'Salah Eddine', busNumber: 'Bus 001' },
-            { id: 8, name: 'Arwa Mansouri', busNumber: 'Bus 001' },
-          ],
-        };
-        setStudentsData(studentsResponse);
-        
-        // Simuler des notifications récentes
-        const notificationsData = [
-          { id: 1, message: 'Bus 001 a quitté l\'école à 16:30', timestamp: new Date(Date.now() - 5000), type: 'info' },
-          { id: 2, message: 'Élève Ahmed Trabelsi est monté à l\'arrêt Centre Ville', timestamp: new Date(Date.now() - 15000), type: 'success' },
-          { id: 3, message: 'Retard de 5 minutes détecté sur la ligne principale', timestamp: new Date(Date.now() - 30000), type: 'warning' },
-          { id: 4, message: 'Sara Haddad marquée comme absente', timestamp: new Date(Date.now() - 45000), type: 'error' },
-        ];
-        // Trier les notifications par timestamp décroissant (plus récente en premier)
-        notificationsData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        const students = await fetchStudents();
+        const events = await fetchEvents();
+
+        if (!Array.isArray(students)) {
+          console.error('Données élèves non valides :', students);
+          throw new Error('Données élèves invalides');
+        }
+        if (!Array.isArray(events)) {
+          console.error('Données événements non valides :', events);
+          throw new Error('Données événements invalides');
+        }
+
+        const presentBadgeIds = events
+          .filter(event => {
+            if (!event || !event.badgeID || !event.date || !event.event) {
+              console.warn('Événement invalide :', event);
+              return false;
+            }
+            const isInEvent = normalizeString(event.event) === 'in';
+            const eventDate = normalizeDate(event.date);
+            const current = normalizeDate(currentDate);
+            const badgeID = normalizeString(event.badgeID);
+            console.log(`Vérification événement : badgeID=${event.badgeID}, normalized=${badgeID}, event=${event.event}, date=${event.date}, normalized=${eventDate}, match=${eventDate === current && isInEvent}`);
+            return isInEvent && eventDate === current;
+          })
+          .map(event => normalizeString(event.badgeID));
+
+        console.log('Badge IDs présents :', presentBadgeIds);
+
+        const presentStudents = students
+          .filter(student => {
+            if (!student || !student.badgeId || !student.username) {
+              console.warn('Élève invalide :', student);
+              return false;
+            }
+            const studentBadge = normalizeString(student.badgeId);
+            const isPresent = presentBadgeIds.includes(studentBadge);
+            console.log(`Vérification élève : name=${student.username}, badgeId=${student.badgeId}, normalized=${studentBadge}, présent=${isPresent}`);
+            return isPresent;
+          })
+          .map(student => ({
+            id: student._id,
+            name: student.username,
+            busNumber: 'Bus 001',
+            time: events.find(e => normalizeString(e.badgeID) === normalizeString(student.badgeId) && normalizeString(e.event) === 'in' && normalizeDate(e.date) === normalizeDate(currentDate))?.time || 'N/A'
+          }));
+
+        const absentStudents = students
+          .filter(student => {
+            if (!student || !student.badgeId || !student.username) {
+              console.warn('Élève invalide :', student);
+              return false;
+            }
+            const studentBadge = normalizeString(student.badgeId);
+            const isAbsent = !presentBadgeIds.includes(studentBadge);
+            console.log(`Vérification élève : name=${student.username}, badgeId=${student.badgeId}, normalized=${studentBadge}, absent=${isAbsent}`);
+            return isAbsent;
+          })
+          .map(student => ({
+            id: student._id,
+            name: student.username,
+            busNumber: 'Bus 001'
+          }));
+
+        setStudentsData({
+          present: presentStudents,
+          absent: absentStudents,
+          allStudents: students.map(student => ({
+            id: student._id,
+            name: student.username || 'Nom inconnu',
+            busNumber: 'Bus 001'
+          }))
+        });
+
+        const notificationsData = events
+          .filter(event => event && normalizeDate(event.date) === normalizeDate(currentDate))
+          .map(event => ({
+            id: event._id,
+            message: event.rawMessage || 'Message manquant',
+            timestamp: new Date(event.createdAt || Date.now()),
+            type: normalizeString(event.event) === 'in' ? 'success' : 'info'
+          }))
+          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
         setNotifications(notificationsData);
-        
+
+        if (presentStudents.length === 0 && events.length > 0) {
+          console.warn('Aucun élève présent détecté. Vérifiez date, badgeID ou événement.');
+        }
       } catch (err) {
-        console.error('Erreur lors de la récupération des élèves:', err);
-        toast.error('Erreur lors de la récupération des données élèves.', { position: 'top-right' });
+        console.error('Erreur fetchStudentsAndEvents :', err);
+        toast.error(`Erreur récupération données élèves : ${err.message}`, { position: 'top-right' });
       } finally {
         setStudentsLoading(false);
       }
     };
 
     if (token) {
+      console.log('Token utilisé :', token);
       fetchStopsData();
-      fetchComptages(); // Call the new fetch function
-      fetchStudentsData();
+      fetchStudentsAndEvents();
     } else {
       setError('Utilisateur non authentifié');
       setLoading(false);
       setStudentsLoading(false);
+      toast.error('Utilisateur non authentifié', { position: 'top-right' });
     }
   }, [token]);
 
-  // Fonctions utilitaires
   const handleGenerateReport = () => {
     const reportData = `
-      Rapport de Transport Scolaire - ${new Date().toLocaleDateString()}
+      Rapport Transport Scolaire - ${new Date().toLocaleDateString()}
       ========================================================
       
       STATISTIQUES GÉNÉRALES:
-      - Nombre de comptages: ${comptageCount}
-      - Nombre d'arrêts enregistrés: ${stopsData.length}
+      - Nombre d'arrêts: ${stopsData.length}
       - Élèves présents: ${studentsData.present.length}
       - Élèves absents: ${studentsData.absent.length}
-      - Total élèves: ${studentsData.present.length + studentsData.absent.length}
+      - Total élèves: ${studentsData.allStudents.length}
       
       DÉTAIL DES ARRÊTS:
       ${stopsData.map((stop, index) => `
       ${index + 1}. ${stop.station}
-         - Durée d'arrêt: ${formatDuration(stop.duration)}
-         - Heure d'arrivée: ${stop.arrivalTime}
-         - Heure de départ: ${stop.departureTime}
+         - Durée: ${formatDuration(stop.duration)}
+         - Arrivée: ${stop.arrivalTime}
+         - Départ: ${stop.departureTime}
          - Séquence: ${stop.stopSequence}
       `).join('')}
       
       ÉLÈVES PRÉSENTS:
       ${studentsData.present.map((student, index) => `
-      ${index + 1}. ${student.name} (${student.busNumber})
+      ${index + 1}. ${student.name} (${student.busNumber}) - Monté à: ${student.time}
       `).join('')}
       
       ÉLÈVES ABSENTS:
@@ -226,10 +337,9 @@ export default function StatsSection() {
     a.download = `rapport_transport_${new Date().toISOString().split('T')[0]}.txt`;
     a.click();
     window.URL.revokeObjectURL(url);
-    toast.success('Rapport généré et téléchargé !', { position: 'top-right' });
+    toast.success('Rapport généré !', { position: 'top-right' });
   };
 
-  // Filtrer les élèves selon le terme de recherche
   const filteredPresentStudents = studentsData.present.filter((student) =>
     student.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -240,9 +350,7 @@ export default function StatsSection() {
 
   return (
     <div className="p-4 lg:p-6 bg-gray-50 min-h-screen space-y-6">
-      
-      {/* Section Statistiques rapides */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl p-6 shadow-lg">
           <div className="flex items-center justify-between">
             <div>
@@ -252,17 +360,6 @@ export default function StatsSection() {
             </div>
           </div>
         </div>
-        
-        <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl p-6 shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <FaCalculator className="text-3xl mb-2" />
-              <h3 className="text-lg font-semibold">Comptages Enregistrés</h3>
-              <p className="text-2xl font-bold">{comptageCount}</p>
-            </div>
-          </div>
-        </div>
-        
         <div className="bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl p-6 shadow-lg">
           <div className="flex items-center justify-between">
             <div>
@@ -272,7 +369,6 @@ export default function StatsSection() {
             </div>
           </div>
         </div>
-        
         <div className="bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl p-6 shadow-lg">
           <div className="flex items-center justify-between">
             <div>
@@ -290,7 +386,6 @@ export default function StatsSection() {
         </div>
       </div>
 
-      {/* Section Notifications récentes */}
       <div className="bg-white rounded-xl shadow-lg overflow-hidden">
         <div className="bg-gradient-to-r from-yellow-600 to-yellow-700 p-4 text-white">
           <div className="flex items-center">
@@ -301,7 +396,6 @@ export default function StatsSection() {
             </div>
           </div>
         </div>
-        
         <div className="p-4">
           {notifications.length === 0 ? (
             <div className="text-center py-8">
@@ -341,7 +435,6 @@ export default function StatsSection() {
         </div>
       </div>
 
-      {/* Section Tableau des Élèves */}
       <div className="bg-white rounded-xl shadow-lg overflow-hidden">
         <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 p-6 text-white">
           <div className="flex items-center justify-between">
@@ -353,14 +446,12 @@ export default function StatsSection() {
               </div>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold">{studentsData.present.length + studentsData.absent.length}</div>
+              <div className="text-2xl font-bold">{studentsData.allStudents.length}</div>
               <div className="text-indigo-100 text-sm">Total Élèves</div>
             </div>
           </div>
         </div>
-
         <div className="p-6">
-          {/* Barre de recherche */}
           <div className="mb-6">
             <div className="relative max-w-md">
               <input
@@ -373,7 +464,6 @@ export default function StatsSection() {
               <FaSearch className="absolute left-3 top-4 text-gray-400" />
             </div>
           </div>
-
           {studentsLoading ? (
             <div className="text-center py-12">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-4"></div>
@@ -381,13 +471,11 @@ export default function StatsSection() {
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Tableau des Élèves Présents */}
               <div className="bg-green-50 rounded-lg p-4">
                 <h4 className="text-lg font-semibold mb-4 flex items-center text-green-700">
                   <FaCheckCircle className="mr-2" /> 
                   Élèves Présents ({filteredPresentStudents.length})
                 </h4>
-                
                 {filteredPresentStudents.length > 0 ? (
                   <div className="bg-white rounded-lg overflow-hidden border border-green-200">
                     <table className="w-full">
@@ -396,6 +484,7 @@ export default function StatsSection() {
                           <th className="px-4 py-3 text-left text-sm font-medium text-green-800">#</th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-green-800">Nom</th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-green-800">Bus</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-green-800">Heure</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-green-100">
@@ -404,6 +493,7 @@ export default function StatsSection() {
                             <td className="px-4 py-3 text-sm text-green-700">{index + 1}</td>
                             <td className="px-4 py-3 text-sm font-medium text-green-800">{student.name}</td>
                             <td className="px-4 py-3 text-sm text-green-600">{student.busNumber}</td>
+                            <td className="px-4 py-3 text-sm text-green-600">{student.time}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -416,14 +506,11 @@ export default function StatsSection() {
                   </div>
                 )}
               </div>
-
-              {/* Tableau des Élèves Absents */}
               <div className="bg-red-50 rounded-lg p-4">
                 <h4 className="text-lg font-semibold mb-4 flex items-center text-red-700">
                   <FaTimesCircle className="mr-2" /> 
                   Élèves Absents ({filteredAbsentStudents.length})
                 </h4>
-                
                 {filteredAbsentStudents.length > 0 ? (
                   <div className="bg-white rounded-lg overflow-hidden border border-red-200">
                     <table className="w-full">
@@ -457,7 +544,6 @@ export default function StatsSection() {
         </div>
       </div>
 
-      {/* Section Arrêts du Bus */}
       <div className="bg-white rounded-xl shadow-lg overflow-hidden">
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 text-white">
           <div className="flex items-center justify-between">
@@ -476,7 +562,6 @@ export default function StatsSection() {
             )}
           </div>
         </div>
-
         <div className="p-6">
           {loading ? (
             <div className="text-center py-12">
@@ -495,11 +580,10 @@ export default function StatsSection() {
             <div className="text-center py-12">
               <FaBus className="mx-auto text-gray-400 text-5xl mb-4" />
               <p className="text-gray-500 text-lg font-medium">Aucun arrêt enregistré</p>
-              <p className="text-gray-400 text-sm mt-1">Les données apparaîtront ici une fois disponibles</p>
+              <p className="text-gray-400 text-sm mt-1">Les données apparaîtront ici</p>
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Cartes pour mobile */}
               <div className="block lg:hidden space-y-4">
                 {stopsData.map((stop, index) => (
                   <div
@@ -513,7 +597,6 @@ export default function StatsSection() {
                         <h4 className="text-lg font-semibold text-gray-800 truncate">{stop.station}</h4>
                       </div>
                     </div>
-                    
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div className="flex items-center">
                         <FaClock className="text-green-600 mr-2 text-xs" />
@@ -538,8 +621,6 @@ export default function StatsSection() {
                   </div>
                 ))}
               </div>
-
-              {/* Tableau pour desktop */}
               <div className="hidden lg:block">
                 <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                   <div className="overflow-x-auto">
@@ -628,40 +709,30 @@ export default function StatsSection() {
           animation: fadeIn 0.6s ease-out forwards;
           opacity: 0;
         }
-        
-        /* Assurer que le contenu ne déborde pas */
         .max-w-full {
           max-width: calc(100vw - 2rem);
         }
-        
         @media (min-width: 1024px) {
           .max-w-full {
             max-width: calc(100vw - 280px);
           }
         }
-        
-        /* Responsive table */
         @media (max-width: 1280px) {
           .max-w-full {
             max-width: calc(100vw - 1rem);
           }
         }
-        
-        /* Scrollbar styling */
         .overflow-y-auto::-webkit-scrollbar {
           width: 6px;
         }
-        
         .overflow-y-auto::-webkit-scrollbar-track {
           background: #f1f1f1;
-          border-radius: 10px;
+          border-radius: 8px;
         }
-        
         .overflow-y-auto::-webkit-scrollbar-thumb {
           background: #888;
-          border-radius: 10px;
+          border-radius: 8px;
         }
-        
         .overflow-y-auto::-webkit-scrollbar-thumb:hover {
           background: #555;
         }
