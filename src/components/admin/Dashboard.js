@@ -632,7 +632,7 @@ export default function AdminDashboard({ _userId }) {
                       <input
                         id="cinNumber"
                         name="cinNumber"
-                        type="number"
+                        type="text"
                         placeholder="Num CIN"
                         value={newUser.cinNumber}
                         onChange={(e) => handleInputChange(e, 'user')}

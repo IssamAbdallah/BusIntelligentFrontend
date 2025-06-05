@@ -32,9 +32,9 @@ const formatDate = (isoDate) => {
   return `${day}-${month}-${year}`;
 };
 
-// Normaliser les chaînes (supprimer espaces, ignorer casse)
+// Normaliser les chaînes (supprimer espaces, ignorer casse, supprimer caractères spéciaux)
 const normalizeString = (str) => {
-  return str ? String(str).trim().toLowerCase() : '';
+  return str ? String(str).trim().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
 };
 
 // Normaliser la date en DD-MM-YYYY
@@ -69,7 +69,7 @@ const normalizeDate = (dateStr) => {
     return normalized;
   }
   console.warn(`Impossible de normaliser la date : ${dateStr}`);
-  return dateStr;
+  return '';
 };
 
 // Obtenir la date actuelle en DD-MM-YYYY
@@ -158,7 +158,7 @@ export default function StatsSection() {
           throw new Error(`Échec récupération élèves : ${errorData.message || studentsResponse.statusText}`);
         }
         const students = await studentsResponse.json();
-        console.log('Élèves récupérés :', JSON.stringify(students, null, 2));
+        console.log('Données brutes élèves :', JSON.stringify(students, null, 2));
         return students;
       } catch (err) {
         console.error('Erreur fetchStudents :', err);
@@ -177,7 +177,7 @@ export default function StatsSection() {
           throw new Error(`Échec récupération événements : ${errorData.error || eventsResponse.statusText}`);
         }
         const events = await eventsResponse.json();
-        console.log('Réponse brute événements :', JSON.stringify(events, null, 2));
+        console.log('Données brutes événements :', JSON.stringify(events, null, 2));
         const eventData = Array.isArray(events.data) ? events.data : Array.isArray(events) ? events : [];
         console.log('Événements extraits :', JSON.stringify(eventData, null, 2));
         return eventData;
@@ -202,17 +202,18 @@ export default function StatsSection() {
           throw new Error('Données événements invalides');
         }
 
+        console.log('Dates des événements :', events.map(event => event.date));
+
         const presentBadgeIds = events
           .filter(event => {
             if (!event || !event.badgeID || !event.date || !event.event) {
               console.warn('Événement invalide :', event);
               return false;
             }
-            const isInEvent = normalizeString(event.event) === 'in';
+            const isInEvent = ['in', 'IN', 'entree', 'entrée'].includes(normalizeString(event.event));
             const eventDate = normalizeDate(event.date);
             const current = normalizeDate(currentDate);
-            const badgeID = normalizeString(event.badgeID);
-            console.log(`Vérification événement : badgeID=${event.badgeID}, normalized=${badgeID}, event=${event.event}, date=${event.date}, normalized=${eventDate}, match=${eventDate === current && isInEvent}`);
+            console.log(`Vérification événement : badgeID=${event.badgeID}, normalized=${normalizeString(event.badgeID)}, event=${event.event}, normalizedEvent=${normalizeString(event.event)}, date=${event.date}, normalizedDate=${eventDate}, current=${current}, isInEvent=${isInEvent}, match=${eventDate === current}`);
             return isInEvent && eventDate === current;
           })
           .map(event => normalizeString(event.badgeID));
@@ -234,7 +235,7 @@ export default function StatsSection() {
             id: student._id,
             name: student.username,
             busNumber: 'Bus 001',
-            time: events.find(e => normalizeString(e.badgeID) === normalizeString(student.badgeId) && normalizeString(e.event) === 'in' && normalizeDate(e.date) === normalizeDate(currentDate))?.time || 'N/A'
+            time: events.find(e => normalizeString(e.badgeID) === normalizeString(student.badgeId) && ['in', 'IN', 'entree', 'entrée'].includes(normalizeString(e.event)) && normalizeDate(e.date) === normalizeDate(currentDate))?.time || 'N/A'
           }));
 
         const absentStudents = students
@@ -270,7 +271,7 @@ export default function StatsSection() {
             id: event._id,
             message: event.rawMessage || 'Message manquant',
             timestamp: new Date(event.createdAt || Date.now()),
-            type: normalizeString(event.event) === 'in' ? 'success' : 'info'
+            type: ['in', 'IN', 'entree', 'entrée'].includes(normalizeString(event.event)) ? 'success' : 'info'
           }))
           .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
@@ -278,6 +279,12 @@ export default function StatsSection() {
 
         if (presentStudents.length === 0 && events.length > 0) {
           console.warn('Aucun élève présent détecté. Vérifiez date, badgeID ou événement.');
+          toast.warn('Aucun élève présent détecté. Vérifiez les données.', { position: 'top-right' });
+        }
+
+        if (events.every(event => normalizeDate(event.date) !== normalizeDate(currentDate))) {
+          console.warn('Aucun événement trouvé pour la date actuelle.');
+          toast.warn('Aucun événement trouvé pour la date actuelle.', { position: 'top-right' });
         }
       } catch (err) {
         console.error('Erreur fetchStudentsAndEvents :', err);
